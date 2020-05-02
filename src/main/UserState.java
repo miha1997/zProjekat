@@ -1,11 +1,19 @@
 package main;
 
+import org.bouncycastle.openpgp.PGPPublicKey;
+import org.bouncycastle.openpgp.PGPSecretKey;
+
 public class UserState {
     //for generating keyPair
     private String name;
     private String email;
     private String password;
     private int keySize;
+
+    private boolean sign;
+    private PGPSecretKey secretKey;
+    private PGPPublicKey publicKey;
+    private String pass;
 
     private static UserState userState;
 
@@ -50,5 +58,37 @@ public class UserState {
 
     public void setKeySize(int keySize) {
         this.keySize = keySize;
+    }
+
+    public boolean isSign() {
+        return sign;
+    }
+
+    public void setSign(boolean sign) {
+        this.sign = sign;
+    }
+
+    public PGPSecretKey getSecretKey() {
+        return secretKey;
+    }
+
+    public void setSecretKey(PGPSecretKey secretKey) {
+        this.secretKey = secretKey;
+    }
+
+    public String getPass() {
+        return pass;
+    }
+
+    public void setPass(String pass) {
+        this.pass = pass;
+    }
+
+    public PGPPublicKey getPublicKey() {
+        return publicKey;
+    }
+
+    public void setPublicKey(PGPPublicKey publicKey) {
+        this.publicKey = publicKey;
     }
 }

@@ -37,6 +37,8 @@ public class EnterPassword {
         UserState.getUserState().setPassword(password);
         CryptoLogic.getCryptoLogic().generateKeyPair();
 
+        Home.instance.loadKeyList();
+
         //close current window
         Stage stage = (Stage) errorMessage.getScene().getWindow();
         stage.close();

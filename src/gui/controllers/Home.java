@@ -37,6 +37,8 @@ public class Home implements Initializable {
     @FXML
     private TreeTableColumn<PrivateKey, String> masterKeyColumnPrivate;
 
+    public static Home instance;
+
     public void newKeyPair(ActionEvent event){
         Parent root;
         try {
@@ -69,11 +71,11 @@ public class Home implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        instance = this;
         loadKeyList();
-
     }
 
-    private void loadKeyList(){
+    public void loadKeyList(){
         TreeItem<PrivateKey> privateKeyRoot = new TreeItem<>(new PrivateKey("name", "keyId", false));
 
         for(PrivateKey privateKey: Keys.getInstance().getPrivateKeys()){

@@ -28,35 +28,22 @@ public class Keys {
     public PGPPublicKeyRingCollection pgpPublicKeyRingCollection;
     public PGPSecretKeyRingCollection pgpSecretKeyRingCollection;
 
-    private PGPPublicKeyRing publicKeyRing;
-
     private Keys() {
 
         try {
             publicIn = new BCPGInputStream(PGPUtil.getDecoderStream(new BufferedInputStream(new FileInputStream(publicKeysFileName))));
             secretIn = new BCPGInputStream(PGPUtil.getDecoderStream(new BufferedInputStream(new FileInputStream(secretKeysFileName))));
 
-            publicKeyRing = new PGPPublicKeyRing(publicIn, new JcaKeyFingerprintCalculator());
-
-
-            pgpPublicKeyRingCollection = new PGPPublicKeyRingCollection(publicIn, new JcaKeyFingerprintCalculator());
-            pgpSecretKeyRingCollection = new PGPSecretKeyRingCollection(secretIn, new JcaKeyFingerprintCalculator());
+            if (publicIn.available() > 0)
+                pgpPublicKeyRingCollection = new PGPPublicKeyRingCollection(publicIn, new JcaKeyFingerprintCalculator());
+            if (secretIn.available() > 0)
+                pgpSecretKeyRingCollection = new PGPSecretKeyRingCollection(secretIn, new JcaKeyFingerprintCalculator());
 
         } catch (IOException | PGPException e) {
             e.printStackTrace();
         }
     }
 
-    public void testPublicKeyRing(){
-        Iterator keyIter = publicKeyRing.getPublicKeys();
-        while (keyIter.hasNext()) {
-            PGPPublicKey key = (PGPPublicKey) keyIter.next();
-
-            if (key.isEncryptionKey()) {
-                PGPKeyTools.printPublicKey(key);
-            }
-        }
-    }
     public void printPublicKeys() {
         Iterator keyRingIter = pgpPublicKeyRingCollection.getKeyRings();
         while (keyRingIter.hasNext()) {
@@ -75,6 +62,7 @@ public class Keys {
 
     public ArrayList<Home.PrivateKey> getPrivateKeys(){
         ArrayList<Home.PrivateKey> privateKeys = new ArrayList();
+        if (pgpSecretKeyRingCollection == null) return privateKeys;
 
         Iterator keyRingIter = pgpSecretKeyRingCollection.getKeyRings();
         while (keyRingIter.hasNext()) {
@@ -112,15 +100,21 @@ public class Keys {
         }
     }
 
-    public void addPublicKeyRing(PGPPublicKeyRing pgpPublicKeyRing) throws IOException {
-        pgpPublicKeyRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(Keys.getInstance().pgpPublicKeyRingCollection, pgpPublicKeyRing);
+    public void addPublicKeyRing(PGPPublicKeyRing pgpPublicKeyRing) throws IOException, PGPException {
+        if (pgpPublicKeyRingCollection == null)
+            pgpPublicKeyRingCollection = new PGPPublicKeyRingCollection(pgpPublicKeyRing.getEncoded(), new JcaKeyFingerprintCalculator());
+        else
+            pgpPublicKeyRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(Keys.getInstance().pgpPublicKeyRingCollection, pgpPublicKeyRing);
         ArmoredOutputStream publicOut = new ArmoredOutputStream (new FileOutputStream("public.asc"));
         pgpPublicKeyRingCollection.encode(publicOut);
         publicOut.close();
     }
 
-    public void addSecretKeyRing(PGPSecretKeyRing pgpSecretKeyRing) throws IOException {
-        pgpSecretKeyRingCollection = PGPSecretKeyRingCollection.addSecretKeyRing(Keys.getInstance().pgpSecretKeyRingCollection, pgpSecretKeyRing);
+    public void addSecretKeyRing(PGPSecretKeyRing pgpSecretKeyRing) throws IOException, PGPException {
+        if (pgpSecretKeyRingCollection == null)
+            pgpSecretKeyRingCollection = new PGPSecretKeyRingCollection(pgpSecretKeyRing.getEncoded(), new JcaKeyFingerprintCalculator());
+        else
+            pgpSecretKeyRingCollection = PGPSecretKeyRingCollection.addSecretKeyRing(Keys.getInstance().pgpSecretKeyRingCollection, pgpSecretKeyRing);
         ArmoredOutputStream secretOut = new ArmoredOutputStream (new FileOutputStream("secret.asc"));
         pgpSecretKeyRingCollection.encode(secretOut);
         secretOut.close();
@@ -131,6 +125,6 @@ public class Keys {
     }
 
     public static void main(String[] args){
-        Keys.getInstance().testPublicKeyRing();
+        getInstance().printPrivateKeys();
     }
 }
