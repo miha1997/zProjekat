@@ -3,6 +3,7 @@ package main;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGOutputStream;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
+import org.bouncycastle.cms.CMSSignedDataGenerator;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.*;
 import org.bouncycastle.openpgp.operator.PGPDigestCalculator;
@@ -20,20 +21,20 @@ import java.util.Iterator;
 public class CryptoLogic {
     private static CryptoLogic cryptoLogic;
 
-    private CryptoLogic(){
+    private CryptoLogic() {
         //initialize bouncy castle
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    public static CryptoLogic getCryptoLogic(){
-        if(cryptoLogic == null)
+    public static CryptoLogic getCryptoLogic() {
+        if (cryptoLogic == null)
             cryptoLogic = new CryptoLogic();
 
         return cryptoLogic;
     }
 
     public void generateKeyPair() {
-        try{
+        try {
             String identity = UserState.getUserState().getEmail();
             String passPhrase = UserState.getUserState().getPassword();
             int keySize = UserState.getUserState().getKeySize();
@@ -55,7 +56,7 @@ public class CryptoLogic {
 
             Keys.getInstance().addPublicKeyRing(pgpPublicKeyRing);
             Keys.getInstance().addSecretKeyRing(pgpSecretKeyRing);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -81,18 +82,15 @@ public class CryptoLogic {
     }
 
     private static int readInputLine(ByteArrayOutputStream bOut, InputStream fIn)
-            throws IOException
-    {
+            throws IOException {
         bOut.reset();
 
         int lookAhead = -1;
         int ch;
 
-        while ((ch = fIn.read()) >= 0)
-        {
+        while ((ch = fIn.read()) >= 0) {
             bOut.write(ch);
-            if (ch == '\r' || ch == '\n')
-            {
+            if (ch == '\r' || ch == '\n') {
                 lookAhead = readPassedEOL(bOut, ch, fIn);
                 break;
             }
@@ -102,25 +100,21 @@ public class CryptoLogic {
     }
 
     private static int readInputLine(ByteArrayOutputStream bOut, int lookAhead, InputStream fIn)
-            throws IOException
-    {
+            throws IOException {
         bOut.reset();
 
         int ch = lookAhead;
 
-        do
-        {
+        do {
             bOut.write(ch);
-            if (ch == '\r' || ch == '\n')
-            {
+            if (ch == '\r' || ch == '\n') {
                 lookAhead = readPassedEOL(bOut, ch, fIn);
                 break;
             }
         }
         while ((ch = fIn.read()) >= 0);
 
-        if (ch < 0)
-        {
+        if (ch < 0) {
             lookAhead = -1;
         }
 
@@ -128,12 +122,10 @@ public class CryptoLogic {
     }
 
     private static int readPassedEOL(ByteArrayOutputStream bOut, int lastCh, InputStream fIn)
-            throws IOException
-    {
+            throws IOException {
         int lookAhead = fIn.read();
 
-        if (lastCh == '\r' && lookAhead == '\n')
-        {
+        if (lastCh == '\r' && lookAhead == '\n') {
             bOut.write(lookAhead);
             lookAhead = fIn.read();
         }
@@ -141,102 +133,86 @@ public class CryptoLogic {
         return lookAhead;
     }
 
-    private static byte[] getLineSeparator()
-    {
+    private static byte[] getLineSeparator() {
         String nl = Strings.lineSeparator();
         byte[] nlBytes = new byte[nl.length()];
 
-        for (int i = 0; i != nlBytes.length; i++)
-        {
-            nlBytes[i] = (byte)nl.charAt(i);
+        for (int i = 0; i != nlBytes.length; i++) {
+            nlBytes[i] = (byte) nl.charAt(i);
         }
 
         return nlBytes;
     }
 
     private static void processLine(PGPSignature sig, byte[] line)
-            throws SignatureException, IOException
-    {
+            throws SignatureException, IOException {
         int length = getLengthWithoutWhiteSpace(line);
-        if (length > 0)
-        {
+        if (length > 0) {
             sig.update(line, 0, length);
         }
     }
 
     private static void processLine(OutputStream aOut, PGPSignatureGenerator sGen, byte[] line)
-            throws SignatureException, IOException
-    {
+            throws SignatureException, IOException {
         // note: trailing white space needs to be removed from the end of
         // each line for signature calculation RFC 4880 Section 7.1
         int length = getLengthWithoutWhiteSpace(line);
-        if (length > 0)
-        {
+        if (length > 0) {
             sGen.update(line, 0, length);
         }
 
         aOut.write(line, 0, line.length);
     }
 
-    private static int getLengthWithoutSeparatorOrTrailingWhitespace(byte[] line)
-    {
-        int    end = line.length - 1;
+    private static int getLengthWithoutSeparatorOrTrailingWhitespace(byte[] line) {
+        int end = line.length - 1;
 
-        while (end >= 0 && isWhiteSpace(line[end]))
-        {
+        while (end >= 0 && isWhiteSpace(line[end])) {
             end--;
         }
 
         return end + 1;
     }
 
-    private static boolean isLineEnding(byte b)
-    {
+    private static boolean isLineEnding(byte b) {
         return b == '\r' || b == '\n';
     }
 
-    private static int getLengthWithoutWhiteSpace(byte[] line)
-    {
-        int    end = line.length - 1;
+    private static int getLengthWithoutWhiteSpace(byte[] line) {
+        int end = line.length - 1;
 
-        while (end >= 0 && isWhiteSpace(line[end]))
-        {
+        while (end >= 0 && isWhiteSpace(line[end])) {
             end--;
         }
 
         return end + 1;
     }
 
-    private static boolean isWhiteSpace(byte b)
-    {
+    private static boolean isWhiteSpace(byte b) {
         return isLineEnding(b) || b == '\t' || b == ' ';
     }
 
-    private static String signFile(
-            String          message,
+    private static void signFile(
+            String fileName,
             PGPSecretKey pgpSecKey,
+            OutputStream out,
             char[] pass,
             boolean armor)
-            throws IOException, NoSuchAlgorithmException, NoSuchProviderException, PGPException, SignatureException
-    {
+            throws IOException, PGPException, SignatureException {
 
         PGPPrivateKey pgpPrivKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass));
-        PGPSignatureGenerator sGen = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey()
-                .getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
-        PGPSignatureSubpacketGenerator  spGen = new PGPSignatureSubpacketGenerator();
+        PGPSignatureGenerator sGen = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
+        PGPSignatureSubpacketGenerator spGen = new PGPSignatureSubpacketGenerator();
 
         sGen.init(PGPSignature.CANONICAL_TEXT_DOCUMENT, pgpPrivKey);
 
-        Iterator    it = pgpSecKey.getPublicKey().getUserIDs();
-        if (it.hasNext())
-        {
-            spGen.setSignerUserID(false, (String)it.next());
+        Iterator it = pgpSecKey.getPublicKey().getUserIDs();
+        if (it.hasNext()) {
+            spGen.setSignerUserID(false, (String) it.next());
             sGen.setHashedSubpackets(spGen.generate());
         }
 
-        InputStream fIn = new BufferedInputStream(new ByteArrayInputStream(message.getBytes()));
-        ByteArrayOutputStream encOut = new ByteArrayOutputStream();
-        OutputStream out = encOut;
+        InputStream fIn = new BufferedInputStream(new FileInputStream(fileName));
         ArmoredOutputStream aOut = new ArmoredOutputStream(out);
 
         aOut.beginClearText(PGPUtil.SHA1);
@@ -247,18 +223,16 @@ public class CryptoLogic {
         ByteArrayOutputStream lineOut = new ByteArrayOutputStream();
         int lookAhead = readInputLine(lineOut, fIn);
 
-        lineOut.write((byte)'\r');
-        lineOut.write((byte)'\n');
+        lineOut.write((byte) '\r');
+        lineOut.write((byte) '\n');
         processLine(aOut, sGen, lineOut.toByteArray());
 
-        if (lookAhead != -1)
-        {
-            do
-            {
+        if (lookAhead != -1) {
+            do {
                 lookAhead = readInputLine(lineOut, lookAhead, fIn);
 
-                sGen.update((byte)'\r');
-                sGen.update((byte)'\n');
+                sGen.update((byte) '\r');
+                sGen.update((byte) '\n');
 
                 processLine(aOut, sGen, lineOut.toByteArray());
             }
@@ -274,79 +248,147 @@ public class CryptoLogic {
         sGen.generate().encode(bOut);
 
         aOut.close();
-        return encOut.toString();
     }
 
-    public static String encryptFile(byte[] clearData,
-                                     PGPPublicKey encKey, boolean withIntegrityCheck, boolean armor) throws IOException, PGPException {
-        ByteArrayOutputStream encOut = new ByteArrayOutputStream();
+    public static void encryptFile(
+            String outFileName,
+            OutputStream out,
+            String fileName,
+            PGPPublicKey encKey,
+            char[] passPhrase,
+            boolean armor,
+            boolean withIntegrityCheck) {
 
-        OutputStream out = encOut;
         if (armor) {
             out = new ArmoredOutputStream(out);
         }
+        try {
+            PGPEncryptedDataGenerator encGen = new PGPEncryptedDataGenerator(
+                    new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
 
-        ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+            encGen.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(UserState.getUserState().getPublicKey()).setProvider("BC"));
 
-        OutputStream cos = bOut;
+            ByteArrayOutputStream bOut = new ByteArrayOutputStream();
+            PGPUtil.writeFileToLiteralData(bOut, PGPLiteralData.BINARY,
+                    new File("encPoruka.txt.asc"));
 
-        PGPLiteralDataGenerator lData = new PGPLiteralDataGenerator();
+            byte[] bytes = bOut.toByteArray();
 
-        OutputStream pOut = lData.open(cos, PGPLiteralData.BINARY,
-                PGPLiteralData.CONSOLE, clearData.length,
-                new Date() // current time
-        );
-        pOut.write(clearData);
+            OutputStream cOut = encGen.open(out, bytes.length);
 
-        lData.close();
+            cOut.write(bytes);
+            cOut.close();
 
-        PGPEncryptedDataGenerator encGen = new PGPEncryptedDataGenerator(
-                new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5)
-                        .setWithIntegrityPacket(withIntegrityCheck)
-                        .setSecureRandom(new SecureRandom()).setProvider("BC"));
-
-        encGen.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
-
-        byte[] bytes = bOut.toByteArray();
-
-        OutputStream cOut = encGen.open(out, bytes.length);
-
-        cOut.write(bytes); // obtain the actual bytes from the compressed stream
-
-        cOut.close();
-
-        out.close();
-
-        return encOut.toString();
+            if (armor) {
+                out.close();
+            }
+        } catch (PGPException e) {
+            System.err.println(e);
+            if (e.getUnderlyingException() != null) {
+                e.getUnderlyingException().printStackTrace();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    public static void sendMessage(String inFileName, String outFileName, boolean armor, boolean sign, boolean encrypt) throws IOException, PGPException, SignatureException, NoSuchAlgorithmException, NoSuchProviderException {
+    public static void signAndEncryptFile(String actualFileName, PGPSecretKey pgpSecKey, OutputStream outputStream,
+                                   char[] password, boolean armor, boolean withIntegrityCheck, PGPPublicKey encKey) throws IOException, PGPException, SignatureException {
+        final int BUFFER_SIZE = 1 << 16;
+        if (armor)
+            outputStream = new ArmoredOutputStream(outputStream);
 
-        String message = new String(Files.readAllBytes(Paths.get(inFileName)));
+        // Init encrypted data generator
+        PGPEncryptedDataGenerator encryptedDataGenerator =
+                new PGPEncryptedDataGenerator(new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5)
+                        .setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
 
-        String messageSignature = null;
-        String encryptedMessage = null;
+        encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
 
-        if (sign) {
-            messageSignature = signFile(message,
-                    UserState.getUserState().getSecretKey(),
-                    UserState.getUserState().getPass().toCharArray(),
-                    armor);
+        OutputStream encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
+
+        // Init compression
+//         PGPCompressedDataGenerator compressedDataGenerator = new PGPCompressedDataGenerator(PGPCompressedData.ZIP);
+//         OutputStream compressedOut = compressedDataGenerator.open(encryptedOut);
+
+        // Init signature
+        PGPPrivateKey pgpPrivKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(password));
+        PGPSignatureGenerator signatureGenerator = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
+
+        signatureGenerator.init(PGPSignature.BINARY_DOCUMENT, pgpPrivKey);
+
+        Iterator it = pgpSecKey.getPublicKey().getUserIDs();
+        if (it.hasNext()) {
+            PGPSignatureSubpacketGenerator spGen = new PGPSignatureSubpacketGenerator();
+
+            spGen.setSignerUserID(false, (String) it.next());
+            signatureGenerator.setHashedSubpackets(spGen.generate());
         }
 
-        if (encrypt){
-            encryptedMessage = encryptFile(message.getBytes(), UserState.getUserState().getPublicKey(), true, armor);
+        signatureGenerator.generateOnePassVersion(false).encode(encryptedOut);
+
+        // Create the Literal Data generator output stream
+        PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
+        OutputStream literalOut = literalDataGenerator.open(encryptedOut, PGPLiteralData.BINARY,
+                PGPLiteralData.CONSOLE, new Date(), new byte[BUFFER_SIZE]);
+
+        // Open the input file
+        InputStream inputStream = new BufferedInputStream(new FileInputStream(actualFileName));
+        int ch;
+        while ((ch = inputStream.read()) >= 0)
+        {
+            literalOut.write(ch);
+            signatureGenerator.update((byte)ch);
         }
 
-        FileOutputStream outputStream = new FileOutputStream(outFileName + ".asc");
-        byte[] strToBytes = messageSignature.getBytes();
-        outputStream.write(strToBytes);
+        literalOut.close();
+        literalDataGenerator.close();
+        signatureGenerator.generate().encode(encryptedOut);
+//        compressedOut.close();
+//        compressedDataGenerator.close();
+        encryptedOut.close();
+        encryptedDataGenerator.close();
+        inputStream.close();
 
-        System.out.println(messageSignature);
+        if (armor)
+            outputStream.close();
+    }
 
-        System.out.println(encryptedMessage);
+    public static void sendMessage(String fileName, String outFileName, boolean armor, boolean sign, boolean encrypt) throws IOException, PGPException, SignatureException, NoSuchAlgorithmException, NoSuchProviderException {
 
-        outputStream.close();
+//        OutputStream out = new BufferedOutputStream(new FileOutputStream(outFileName));
+////
+//        if (sign) {
+//            signFile(fileName,
+//                    UserState.getUserState().getSecretKey(),
+//                    out,
+//                    UserState.getUserState().getPass().toCharArray(),
+//                    armor);
+//        }
+//
+//        if (encrypt){
+//            boolean withIntegrityCheck = true;
+//            out = new BufferedOutputStream(new FileOutputStream(outFileName));
+//            encryptFile(
+//                    outFileName,
+//                    out,
+//                    fileName,
+//                    UserState.getUserState().getPublicKey(),
+//                    UserState.getUserState().getPass().toCharArray(),
+//                    armor,
+//                    withIntegrityCheck);
+//        }
+
+        OutputStream out = new BufferedOutputStream(new FileOutputStream(outFileName));
+
+        signAndEncryptFile(
+                fileName,
+                UserState.getUserState().getSecretKey(),
+                out,
+                UserState.getUserState().getPass().toCharArray(),
+                armor,
+                true,
+                UserState.getUserState().getPublicKey());
     }
 
     public static void main(String[] args){
@@ -356,7 +398,7 @@ public class CryptoLogic {
             UserState.getUserState().setPublicKey(Keys.getInstance().pgpPublicKeyRingCollection.getPublicKey(new BigInteger("9dfa654cc9b45f65", 16).longValue()));
             UserState.getUserState().setSecretKey(Keys.getInstance().pgpSecretKeyRingCollection.getSecretKey(new BigInteger("9dfa654cc9b45f65", 16).longValue()));
             UserState.getUserState().setPass("test");
-            sendMessage("poruka.txt", "encPoruka.txt", true, true, false);
+            sendMessage("poruka.txt", "encPoruka.txt.asc", true, true, true);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (PGPException e) {
