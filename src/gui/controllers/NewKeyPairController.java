@@ -13,6 +13,7 @@ import main.CryptoLogic;
 import main.UserState;
 
 import java.io.IOException;
+import java.util.Objects;
 
 
 public class NewKeyPairController {
@@ -53,9 +54,9 @@ public class NewKeyPairController {
             keySize = 4096;
 
         //preserve data
-        UserState.getUserState().setName(name);
-        UserState.getUserState().setEmail(email);
-        UserState.getUserState().setKeySize(keySize);
+        UserState.instance.name = name;
+        UserState.instance.email = email;
+        UserState.instance.keySize = keySize;
 
         //close current window
         Stage stage = (Stage) errorMessageLabel.getScene().getWindow();
@@ -64,7 +65,7 @@ public class NewKeyPairController {
         //open new one
         Parent root;
         try {
-            root = FXMLLoader.load(getClass().getClassLoader().getResource("gui/layouts/enterPassword.fxml"));
+            root = FXMLLoader.load(Objects.requireNonNull(getClass().getClassLoader().getResource("gui/layouts/enterPassword.fxml")));
             stage = new Stage();
             stage.setTitle("Enter Password");
             stage.setScene(new Scene(root, 500, 400));

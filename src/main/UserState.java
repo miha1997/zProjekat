@@ -5,34 +5,24 @@ import org.bouncycastle.openpgp.PGPSecretKey;
 
 public class UserState {
     //for generating keyPair
-    private String name;
-    private String email;
-    private String password;
-    private int keySize;
+    public String name;
+    public String email;
+    public String password;
+    public int keySize;
 
-    private boolean sign;
-    private PGPSecretKey secretKey;
-    private PGPPublicKey publicKey;
-    private String pass;
-    private boolean radix64;
-    private boolean encrypt;
-    private boolean compress;
-    private String inputFileName;
-    private String outputFileName;
+    public boolean sign;
+    public PGPSecretKey secretKey;
+    public PGPPublicKey publicKey;
+    public String pass;
+    public boolean radix64;
+    public boolean encrypt;
+    public boolean compress;
+    public String inputFileName;
+    public String outputFileName;
 
-
-
-    private static UserState userState;
+    public static final UserState instance = new UserState();
 
     private UserState(){
-
-    }
-
-    public static UserState getUserState(){
-        if(userState == null)
-            userState = new UserState();
-
-        return userState;
     }
 
     public String getName() {

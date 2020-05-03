@@ -1,5 +1,6 @@
 package main;
 
+import org.apache.commons.io.FileUtils;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGOutputStream;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
@@ -35,9 +36,9 @@ public class CryptoLogic {
 
     public void generateKeyPair() {
         try {
-            String identity = UserState.getUserState().getEmail();
-            String passPhrase = UserState.getUserState().getPassword();
-            int keySize = UserState.getUserState().getKeySize();
+            String identity = UserState.instance.email;
+            String passPhrase = UserState.instance.password;
+            int keySize = UserState.instance.keySize;
 
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA", "BC");
             kpg.initialize(keySize);
@@ -81,220 +82,33 @@ public class CryptoLogic {
         }
     }
 
-    private static int readInputLine(ByteArrayOutputStream bOut, InputStream fIn)
-            throws IOException {
-        bOut.reset();
-
-        int lookAhead = -1;
-        int ch;
-
-        while ((ch = fIn.read()) >= 0) {
-            bOut.write(ch);
-            if (ch == '\r' || ch == '\n') {
-                lookAhead = readPassedEOL(bOut, ch, fIn);
-                break;
-            }
-        }
-
-        return lookAhead;
-    }
-
-    private static int readInputLine(ByteArrayOutputStream bOut, int lookAhead, InputStream fIn)
-            throws IOException {
-        bOut.reset();
-
-        int ch = lookAhead;
-
-        do {
-            bOut.write(ch);
-            if (ch == '\r' || ch == '\n') {
-                lookAhead = readPassedEOL(bOut, ch, fIn);
-                break;
-            }
-        }
-        while ((ch = fIn.read()) >= 0);
-
-        if (ch < 0) {
-            lookAhead = -1;
-        }
-
-        return lookAhead;
-    }
-
-    private static int readPassedEOL(ByteArrayOutputStream bOut, int lastCh, InputStream fIn)
-            throws IOException {
-        int lookAhead = fIn.read();
-
-        if (lastCh == '\r' && lookAhead == '\n') {
-            bOut.write(lookAhead);
-            lookAhead = fIn.read();
-        }
-
-        return lookAhead;
-    }
-
-    private static byte[] getLineSeparator() {
-        String nl = Strings.lineSeparator();
-        byte[] nlBytes = new byte[nl.length()];
-
-        for (int i = 0; i != nlBytes.length; i++) {
-            nlBytes[i] = (byte) nl.charAt(i);
-        }
-
-        return nlBytes;
-    }
-
-    private static void processLine(PGPSignature sig, byte[] line)
-            throws SignatureException, IOException {
-        int length = getLengthWithoutWhiteSpace(line);
-        if (length > 0) {
-            sig.update(line, 0, length);
-        }
-    }
-
-    private static void processLine(OutputStream aOut, PGPSignatureGenerator sGen, byte[] line)
-            throws SignatureException, IOException {
-        // note: trailing white space needs to be removed from the end of
-        // each line for signature calculation RFC 4880 Section 7.1
-        int length = getLengthWithoutWhiteSpace(line);
-        if (length > 0) {
-            sGen.update(line, 0, length);
-        }
-
-        aOut.write(line, 0, line.length);
-    }
-
-    private static int getLengthWithoutSeparatorOrTrailingWhitespace(byte[] line) {
-        int end = line.length - 1;
-
-        while (end >= 0 && isWhiteSpace(line[end])) {
-            end--;
-        }
-
-        return end + 1;
-    }
-
-    private static boolean isLineEnding(byte b) {
-        return b == '\r' || b == '\n';
-    }
-
-    private static int getLengthWithoutWhiteSpace(byte[] line) {
-        int end = line.length - 1;
-
-        while (end >= 0 && isWhiteSpace(line[end])) {
-            end--;
-        }
-
-        return end + 1;
-    }
-
-    private static boolean isWhiteSpace(byte b) {
-        return isLineEnding(b) || b == '\t' || b == ' ';
-    }
-
-    private static void signFile(
-            String fileName,
-            PGPSecretKey pgpSecKey,
-            OutputStream out,
-            char[] pass,
-            boolean armor)
-            throws IOException, PGPException, SignatureException {
-
-        PGPPrivateKey pgpPrivKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass));
-        PGPSignatureGenerator sGen = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
-        PGPSignatureSubpacketGenerator spGen = new PGPSignatureSubpacketGenerator();
-
-        sGen.init(PGPSignature.CANONICAL_TEXT_DOCUMENT, pgpPrivKey);
-
-        Iterator it = pgpSecKey.getPublicKey().getUserIDs();
-        if (it.hasNext()) {
-            spGen.setSignerUserID(false, (String) it.next());
-            sGen.setHashedSubpackets(spGen.generate());
-        }
-
-        InputStream fIn = new BufferedInputStream(new FileInputStream(fileName));
-        ArmoredOutputStream aOut = new ArmoredOutputStream(out);
-
-        aOut.beginClearText(PGPUtil.SHA1);
-
-        //
-        // note the last \n/\r/\r\n in the file is ignored
-        //
-        ByteArrayOutputStream lineOut = new ByteArrayOutputStream();
-        int lookAhead = readInputLine(lineOut, fIn);
-
-        lineOut.write((byte) '\r');
-        lineOut.write((byte) '\n');
-        processLine(aOut, sGen, lineOut.toByteArray());
-
-        if (lookAhead != -1) {
-            do {
-                lookAhead = readInputLine(lineOut, lookAhead, fIn);
-
-                sGen.update((byte) '\r');
-                sGen.update((byte) '\n');
-
-                processLine(aOut, sGen, lineOut.toByteArray());
-            }
-            while (lookAhead != -1);
-        }
-
-        fIn.close();
-
-        aOut.endClearText();
-
-        BCPGOutputStream bOut = new BCPGOutputStream(aOut);
-
-        sGen.generate().encode(bOut);
-
-        aOut.close();
-    }
-
-    public static void encryptFile(
-            String outFileName,
-            OutputStream out,
-            String fileName,
-            PGPPublicKey encKey,
-            char[] passPhrase,
-            boolean armor,
-            boolean withIntegrityCheck) {
-
-        if (armor) {
-            out = new ArmoredOutputStream(out);
-        }
-        try {
-            PGPEncryptedDataGenerator encGen = new PGPEncryptedDataGenerator(
-                    new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
-
-            encGen.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(UserState.getUserState().getPublicKey()).setProvider("BC"));
-
-            ByteArrayOutputStream bOut = new ByteArrayOutputStream();
-            PGPUtil.writeFileToLiteralData(bOut, PGPLiteralData.BINARY,
-                    new File("encPoruka.txt.asc"));
-
-            byte[] bytes = bOut.toByteArray();
-
-            OutputStream cOut = encGen.open(out, bytes.length);
-
-            cOut.write(bytes);
-            cOut.close();
-
-            if (armor) {
-                out.close();
-            }
-        } catch (PGPException e) {
-            System.err.println(e);
-            if (e.getUnderlyingException() != null) {
-                e.getUnderlyingException().printStackTrace();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static void signAndEncryptFile(String actualFileName, PGPSecretKey pgpSecKey, OutputStream outputStream,
-                                          char[] password, boolean armor, boolean withIntegrityCheck, PGPPublicKey encKey) throws IOException, PGPException, SignatureException {
+    public static void sendMessage() throws IOException, PGPException {
         final int BUFFER_SIZE = 1 << 16;
+
+        OutputStream outputStream;
+        OutputStream encryptedOut;
+        OutputStream compressedOut;
+        OutputStream literalOut;
+
+        boolean sign = UserState.instance.sign;
+        boolean compress = UserState.instance.compress;
+        boolean encrypt = UserState.instance.encrypt;
+        boolean armor = UserState.instance.radix64;
+
+        String inputFileName = UserState.instance.inputFileName;
+        String outputFileName = UserState.instance.outputFileName;
+
+        PGPPublicKey publicKey = UserState.instance.publicKey;
+        PGPSecretKey secretKey = UserState.instance.secretKey;
+        char[] password = UserState.instance.pass.toCharArray();
+
+        if (!sign && !compress && !encrypt){
+            FileUtils.copyFile(new File(inputFileName), new File(outputFileName));
+            return;
+        }
+
+        outputStream = new BufferedOutputStream(new FileOutputStream(outputFileName));
+
         if (armor)
             outputStream = new ArmoredOutputStream(outputStream);
 
@@ -303,21 +117,25 @@ public class CryptoLogic {
                 new PGPEncryptedDataGenerator(new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5)
                         .setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
 
-        encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
+        encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(publicKey).setProvider("BC"));
 
-        OutputStream encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
+        encryptedOut = outputStream;
+        if (encrypt)
+            encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
 
         // Init compression
-//         PGPCompressedDataGenerator compressedDataGenerator = new PGPCompressedDataGenerator(PGPCompressedData.ZIP);
-//         OutputStream compressedOut = compressedDataGenerator.open(encryptedOut);
+         PGPCompressedDataGenerator compressedDataGenerator = new PGPCompressedDataGenerator(PGPCompressedData.ZIP);
+         compressedOut = encryptedOut;
+         if (compress)
+            compressedOut = compressedDataGenerator.open(encryptedOut);
 
         // Init signature
-        PGPPrivateKey pgpPrivKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(password));
-        PGPSignatureGenerator signatureGenerator = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
+        PGPPrivateKey pgpPrivKey = secretKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(password));
+        PGPSignatureGenerator signatureGenerator = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(secretKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
 
         signatureGenerator.init(PGPSignature.BINARY_DOCUMENT, pgpPrivKey);
 
-        Iterator it = pgpSecKey.getPublicKey().getUserIDs();
+        Iterator it = secretKey.getPublicKey().getUserIDs();
         if (it.hasNext()) {
             PGPSignatureSubpacketGenerator spGen = new PGPSignatureSubpacketGenerator();
 
@@ -325,215 +143,51 @@ public class CryptoLogic {
             signatureGenerator.setHashedSubpackets(spGen.generate());
         }
 
-        signatureGenerator.generateOnePassVersion(false).encode(encryptedOut);
+        if (sign)
+            signatureGenerator.generateOnePassVersion(false).encode(compressedOut);
 
         // Create the Literal Data generator output stream
         PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
-        OutputStream literalOut = literalDataGenerator.open(encryptedOut, PGPLiteralData.BINARY,
-                PGPLiteralData.CONSOLE, new Date(), new byte[BUFFER_SIZE]);
+        literalOut = literalDataGenerator.open(compressedOut, PGPLiteralData.BINARY,
+                String.valueOf(PGPLiteralData.TEXT), new Date(), new byte[BUFFER_SIZE]);
 
         // Open the input file
-        InputStream inputStream = new BufferedInputStream(new FileInputStream(actualFileName));
+        InputStream inputStream = new BufferedInputStream(new FileInputStream(inputFileName));
         int ch;
-        while ((ch = inputStream.read()) >= 0) {
+        while ((ch = inputStream.read()) >= 0)
+        {
             literalOut.write(ch);
-            signatureGenerator.update((byte) ch);
+            signatureGenerator.update((byte)ch);
         }
 
         literalOut.close();
         literalDataGenerator.close();
-        signatureGenerator.generate().encode(encryptedOut);
-//        compressedOut.close();
-//        compressedDataGenerator.close();
+        if (sign)
+            signatureGenerator.generate().encode(compressedOut);
+        compressedOut.close();
+        compressedDataGenerator.close();
         encryptedOut.close();
         encryptedDataGenerator.close();
         inputStream.close();
-
-        if (armor)
-            outputStream.close();
-    }
-
-    public static void sendMessage(String fileName, String outFileName, boolean armor, boolean sign, boolean encrypt) throws IOException, PGPException, SignatureException, NoSuchAlgorithmException, NoSuchProviderException {
-
-//        OutputStream out = new BufferedOutputStream(new FileOutputStream(outFileName));
-////
-//        if (sign) {
-//            signFile(fileName,
-//                    UserState.getUserState().getSecretKey(),
-//                    out,
-//                    UserState.getUserState().getPass().toCharArray(),
-//                    armor);
-//        }
-//
-//        if (encrypt){
-//            boolean withIntegrityCheck = true;
-//            out = new BufferedOutputStream(new FileOutputStream(outFileName));
-//            encryptFile(
-//                    outFileName,
-//                    out,
-//                    fileName,
-//                    UserState.getUserState().getPublicKey(),
-//                    UserState.getUserState().getPass().toCharArray(),
-//                    armor,
-//                    withIntegrityCheck);
-//        }
-
-        OutputStream out = new BufferedOutputStream(new FileOutputStream(outFileName));
-
-        signAndEncryptFile(
-                fileName,
-                UserState.getUserState().getSecretKey(),
-                out,
-                UserState.getUserState().getPass().toCharArray(),
-                armor,
-                true,
-                UserState.getUserState().getPublicKey());
-
-        out.close();
-    }
-
-    public static void sendMessage() {
-        final int BUFFER_SIZE = 1 << 16;
-        //declare all streams used
-        OutputStream outputStream;
-        OutputStream encryptedOut = null;
-        OutputStream compressedOut = null;
-        OutputStream literalOut;
-        PGPSignatureGenerator signatureGenerator = null;
-        PGPCompressedDataGenerator compressedDataGenerator = null;
-        PGPEncryptedDataGenerator encryptedDataGenerator = null;
-
-
-        //get user input
-        boolean sign = UserState.getUserState().isSign();
-        boolean encrypt = UserState.getUserState().isEncrypt();
-        boolean compress = UserState.getUserState().isCompress();
-        boolean radix64 = UserState.getUserState().isRadix64();
-
-        String inputFileName = UserState.getUserState().getInputFileName();
-        String outputFileName = UserState.getUserState().getOutputFileName();
-
-        try {
-            outputStream = new BufferedOutputStream(new FileOutputStream(outputFileName));
-
-            if (radix64)
-                outputStream = new ArmoredOutputStream(outputStream);
-
-            if (encrypt) {
-                PGPPublicKey encKey = UserState.getUserState().getPublicKey();
-
-                encryptedDataGenerator = new PGPEncryptedDataGenerator(new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).
-                        setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
-
-                encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
-                encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
-            }
-
-            if (compress) {
-                compressedDataGenerator = new PGPCompressedDataGenerator(PGPCompressedData.ZIP);
-
-                if (encrypt)
-                    compressedOut = compressedDataGenerator.open(encryptedOut);
-                else
-                    compressedOut = compressedDataGenerator.open(outputStream);
-            }
-
-            if (sign) {
-                PGPSecretKey pgpSecKey = UserState.getUserState().getSecretKey();
-                String pass = UserState.getUserState().getPass();
-
-                PGPPrivateKey pgpPrivKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass.toCharArray()));
-                signatureGenerator = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
-
-                signatureGenerator.init(PGPSignature.BINARY_DOCUMENT, pgpPrivKey);
-
-                Iterator it = pgpSecKey.getPublicKey().getUserIDs();
-                if (it.hasNext()) {
-                    PGPSignatureSubpacketGenerator spGen = new PGPSignatureSubpacketGenerator();
-
-                    spGen.setSignerUserID(false, (String) it.next());
-                    signatureGenerator.setHashedSubpackets(spGen.generate());
-                }
-
-                if (compress)
-                    signatureGenerator.generateOnePassVersion(false).encode(compressedOut);
-                else if (encrypt)
-                    signatureGenerator.generateOnePassVersion(false).encode(encryptedOut);
-                else
-                    signatureGenerator.generateOnePassVersion(false).encode(outputStream);
-            }
-
-//            // Initialize literal data generator
-//            PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
-//            literalOut = literalDataGenerator.open(outputStream, PGPLiteralData.BINARY, inputFileName, new Date(), new byte [BUFFER_SIZE] );
-
-            // Create the Literal Data generator output stream
-            PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
-
-            if (compress)
-                literalOut = literalDataGenerator.open(compressedOut, PGPLiteralData.BINARY, inputFileName, new Date(), new byte[BUFFER_SIZE]);
-            else if(encrypt)
-                literalOut = literalDataGenerator.open(encryptedOut, PGPLiteralData.BINARY, inputFileName, new Date(), new byte[BUFFER_SIZE]);
-            else
-                literalOut = literalDataGenerator.open(outputStream, PGPLiteralData.BINARY, inputFileName, new Date(), new byte[BUFFER_SIZE]);
-
-            // Open the input file
-            InputStream inputStream = new BufferedInputStream(new FileInputStream(inputFileName));
-
-            BCPGOutputStream bOut = new BCPGOutputStream(literalOut);
-
-            int ch;
-            while ((ch = inputStream.read()) >= 0) {
-                literalOut.write(ch);
-                if (sign)
-                    signatureGenerator.update((byte) ch);
-            }
-
-            literalOut.close();
-            literalDataGenerator.close();
-
-            if (sign)
-                signatureGenerator.generate().encode(bOut);
-
-            if (compress) {
-                compressedOut.close();
-                compressedDataGenerator.close();
-            }
-
-            if (encrypt) {
-                encryptedOut.close();
-                encryptedDataGenerator.close();
-            }
-
-            inputStream.close();
-            bOut.close();
-
-            //if (radix64)
-            outputStream.close();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+        outputStream.close();
     }
 
     public static void main(String[] args) {
         Security.addProvider(new BouncyCastleProvider());
 
         try {
-            UserState.getUserState().setPublicKey(Keys.getInstance().pgpPublicKeyRingCollection.getPublicKey(new BigInteger("9dfa654cc9b45f65", 16).longValue()));
-            UserState.getUserState().setSecretKey(Keys.getInstance().pgpSecretKeyRingCollection.getSecretKey(new BigInteger("9dfa654cc9b45f65", 16).longValue()));
-            UserState.getUserState().setPass("test");
+            UserState.instance.publicKey = Keys.getInstance().pgpPublicKeyRingCollection.getPublicKey(new BigInteger("9dfa654cc9b45f65", 16).longValue());
+            UserState.instance.secretKey = Keys.getInstance().pgpSecretKeyRingCollection.getSecretKey(new BigInteger("9dfa654cc9b45f65", 16).longValue());
+            UserState.instance.pass = "test";
 
-            UserState.getUserState().setInputFileName("poruka.txt");
-            UserState.getUserState().setOutputFileName("poruka.txt.asc");
-            UserState.getUserState().setRadix64(true);
-            UserState.getUserState().setCompress(false);
-            UserState.getUserState().setEncrypt(false);
-            UserState.getUserState().setSign(true);
+            UserState.instance.inputFileName = "poruka.txt";
+            UserState.instance.outputFileName = "poruka.txt.asc";
+            UserState.instance.radix64 = true;
+            UserState.instance.compress = true;
+            UserState.instance.encrypt = false;
+            UserState.instance.sign = true;
 
             sendMessage();
-            //sendMessage("poruka.txt", "encPoruka.txt.asc", false, true, true);
         } catch (Exception e) {
             e.printStackTrace();
         }

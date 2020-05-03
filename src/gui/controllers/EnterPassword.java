@@ -34,7 +34,7 @@ public class EnterPassword {
             return;
         }
 
-        UserState.getUserState().setPassword(password);
+        UserState.instance.password = password;
         CryptoLogic.getCryptoLogic().generateKeyPair();
 
         Home.instance.loadKeyList();
