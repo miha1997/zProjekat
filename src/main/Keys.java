@@ -45,13 +45,13 @@ public class Keys {
     }
 
     public void printPublicKeys() {
-        Iterator keyRingIter = pgpPublicKeyRingCollection.getKeyRings();
+        Iterator<PGPPublicKeyRing> keyRingIter = pgpPublicKeyRingCollection.getKeyRings();
         while (keyRingIter.hasNext()) {
-            PGPPublicKeyRing keyRing = (PGPPublicKeyRing) keyRingIter.next();
+            PGPPublicKeyRing keyRing = keyRingIter.next();
 
-            Iterator keyIter = keyRing.getPublicKeys();
+            Iterator<PGPPublicKey> keyIter = keyRing.getPublicKeys();
             while (keyIter.hasNext()) {
-                PGPPublicKey key = (PGPPublicKey) keyIter.next();
+                PGPPublicKey key = keyIter.next();
 
                 if (key.isEncryptionKey()) {
                     PGPKeyTools.printPublicKey(key);
@@ -60,39 +60,65 @@ public class Keys {
         }
     }
 
-    public ArrayList<Home.PrivateKey> getPrivateKeys(){
-        ArrayList<Home.PrivateKey> privateKeys = new ArrayList();
-        if (pgpSecretKeyRingCollection == null) return privateKeys;
+    public ArrayList<Home.PublicKey> getPublicKeys() {
+        ArrayList publicKeys = new ArrayList();
 
-        Iterator keyRingIter = pgpSecretKeyRingCollection.getKeyRings();
+        if (pgpPublicKeyRingCollection == null) return publicKeys;
+
+        Iterator<PGPPublicKeyRing> keyRingIter = pgpPublicKeyRingCollection.getKeyRings();
         while (keyRingIter.hasNext()) {
-            PGPSecretKeyRing keyRing = (PGPSecretKeyRing) keyRingIter.next();
+            PGPPublicKeyRing keyRing = keyRingIter.next();
 
-            Iterator keyIter = keyRing.getSecretKeys();
+            Iterator<PGPPublicKey> keyIter = keyRing.getPublicKeys();
             while (keyIter.hasNext()) {
-                PGPSecretKey key = (PGPSecretKey) keyIter.next();
+                PGPPublicKey key = keyIter.next();
 
                 String ownerName = key.getUserIDs().next();
                 String keyId = Hex.toHexString(longToBytes(key.getKeyID()));
                 boolean masterKey = key.isMasterKey();
 
-                Home.PrivateKey privateKey = new Home.PrivateKey(ownerName, keyId, masterKey);
-                privateKeys.add(privateKey);
-
+                Home.PublicKey publicKey = new Home.PublicKey(ownerName, keyId, masterKey);
+                publicKeys.add(publicKey);
+                break;
             }
         }
+        return publicKeys;
+    }
 
+    public ArrayList<Home.PrivateKey> getPrivateKeys(){
+        ArrayList<Home.PrivateKey> privateKeys = new ArrayList<>();
+        if (pgpSecretKeyRingCollection == null) return privateKeys;
+
+        Iterator<PGPSecretKeyRing> keyRingIter = pgpSecretKeyRingCollection.getKeyRings();
+        while (keyRingIter.hasNext()) {
+            PGPSecretKeyRing keyRing = keyRingIter.next();
+
+            Iterator<PGPSecretKey> keyIter = keyRing.getSecretKeys();
+            while (keyIter.hasNext()) {
+                PGPSecretKey key = keyIter.next();
+
+                if (key.isSigningKey()) {
+                    String ownerName = key.getUserIDs().next();
+                    String keyId = Hex.toHexString(longToBytes(key.getKeyID()));
+                    boolean masterKey = key.isMasterKey();
+
+                    Home.PrivateKey privateKey = new Home.PrivateKey(ownerName, keyId, masterKey);
+                    privateKeys.add(privateKey);
+                    break;
+                }
+            }
+        }
         return privateKeys;
     }
 
     public void printPrivateKeys(){
-        Iterator keyRingIter = pgpSecretKeyRingCollection.getKeyRings();
+        Iterator<PGPSecretKeyRing> keyRingIter = pgpSecretKeyRingCollection.getKeyRings();
         while (keyRingIter.hasNext()) {
-            PGPSecretKeyRing keyRing = (PGPSecretKeyRing) keyRingIter.next();
+            PGPSecretKeyRing keyRing = keyRingIter.next();
 
-            Iterator keyIter = keyRing.getSecretKeys();
+            Iterator<PGPSecretKey> keyIter = keyRing.getSecretKeys();
             while (keyIter.hasNext()) {
-                PGPSecretKey key = (PGPSecretKey) keyIter.next();
+                PGPSecretKey key = keyIter.next();
 
                 PGPKeyTools.printSecretKey(key);
 
@@ -105,6 +131,7 @@ public class Keys {
             pgpPublicKeyRingCollection = new PGPPublicKeyRingCollection(pgpPublicKeyRing.getEncoded(), new JcaKeyFingerprintCalculator());
         else
             pgpPublicKeyRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(Keys.getInstance().pgpPublicKeyRingCollection, pgpPublicKeyRing);
+
         ArmoredOutputStream publicOut = new ArmoredOutputStream (new FileOutputStream("public.asc"));
         pgpPublicKeyRingCollection.encode(publicOut);
         publicOut.close();

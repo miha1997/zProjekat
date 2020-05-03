@@ -20,18 +20,10 @@ import java.util.Date;
 import java.util.Iterator;
 
 public class CryptoLogic {
-    private static CryptoLogic cryptoLogic;
+    public static final CryptoLogic instance = new CryptoLogic();
 
     private CryptoLogic() {
-        //initialize bouncy castle
         Security.addProvider(new BouncyCastleProvider());
-    }
-
-    public static CryptoLogic getCryptoLogic() {
-        if (cryptoLogic == null)
-            cryptoLogic = new CryptoLogic();
-
-        return cryptoLogic;
     }
 
     public void generateKeyPair() {
@@ -81,6 +73,13 @@ public class CryptoLogic {
             }
         }
     }
+
+    public static void exportKey(PGPKeyRing keyRing, String destination) throws IOException {
+        ArmoredOutputStream outputStream = new ArmoredOutputStream(new FileOutputStream(destination));
+        keyRing.encode(outputStream);
+        outputStream.close();
+    }
+
 
     public static void sendMessage() throws IOException, PGPException {
         final int BUFFER_SIZE = 1 << 16;
