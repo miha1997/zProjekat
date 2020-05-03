@@ -293,7 +293,7 @@ public class CryptoLogic {
     }
 
     public static void signAndEncryptFile(String actualFileName, PGPSecretKey pgpSecKey, OutputStream outputStream,
-                                   char[] password, boolean armor, boolean withIntegrityCheck, PGPPublicKey encKey) throws IOException, PGPException, SignatureException {
+                                          char[] password, boolean armor, boolean withIntegrityCheck, PGPPublicKey encKey) throws IOException, PGPException, SignatureException {
         final int BUFFER_SIZE = 1 << 16;
         if (armor)
             outputStream = new ArmoredOutputStream(outputStream);
@@ -335,10 +335,9 @@ public class CryptoLogic {
         // Open the input file
         InputStream inputStream = new BufferedInputStream(new FileInputStream(actualFileName));
         int ch;
-        while ((ch = inputStream.read()) >= 0)
-        {
+        while ((ch = inputStream.read()) >= 0) {
             literalOut.write(ch);
-            signatureGenerator.update((byte)ch);
+            signatureGenerator.update((byte) ch);
         }
 
         literalOut.close();
@@ -389,27 +388,156 @@ public class CryptoLogic {
                 armor,
                 true,
                 UserState.getUserState().getPublicKey());
+
+        out.close();
     }
 
-    public static void main(String[] args){
+    public static void sendMessage() {
+        final int BUFFER_SIZE = 1 << 16;
+        //declare all streams used
+        OutputStream outputStream;
+        OutputStream encryptedOut = null;
+        OutputStream compressedOut = null;
+        OutputStream literalOut;
+        PGPSignatureGenerator signatureGenerator = null;
+        PGPCompressedDataGenerator compressedDataGenerator = null;
+        PGPEncryptedDataGenerator encryptedDataGenerator = null;
+
+
+        //get user input
+        boolean sign = UserState.getUserState().isSign();
+        boolean encrypt = UserState.getUserState().isEncrypt();
+        boolean compress = UserState.getUserState().isCompress();
+        boolean radix64 = UserState.getUserState().isRadix64();
+
+        String inputFileName = UserState.getUserState().getInputFileName();
+        String outputFileName = UserState.getUserState().getOutputFileName();
+
+        try {
+            outputStream = new BufferedOutputStream(new FileOutputStream(outputFileName));
+
+            if (radix64)
+                outputStream = new ArmoredOutputStream(outputStream);
+
+            if (encrypt) {
+                PGPPublicKey encKey = UserState.getUserState().getPublicKey();
+
+                encryptedDataGenerator = new PGPEncryptedDataGenerator(new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).
+                        setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
+
+                encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
+                encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
+            }
+
+            if (compress) {
+                compressedDataGenerator = new PGPCompressedDataGenerator(PGPCompressedData.ZIP);
+
+                if (encrypt)
+                    compressedOut = compressedDataGenerator.open(encryptedOut);
+                else
+                    compressedOut = compressedDataGenerator.open(outputStream);
+            }
+
+            if (sign) {
+                PGPSecretKey pgpSecKey = UserState.getUserState().getSecretKey();
+                String pass = UserState.getUserState().getPass();
+
+                PGPPrivateKey pgpPrivKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass.toCharArray()));
+                signatureGenerator = new PGPSignatureGenerator(new JcaPGPContentSignerBuilder(pgpSecKey.getPublicKey().getAlgorithm(), PGPUtil.SHA1).setProvider("BC"));
+
+                signatureGenerator.init(PGPSignature.BINARY_DOCUMENT, pgpPrivKey);
+
+                Iterator it = pgpSecKey.getPublicKey().getUserIDs();
+                if (it.hasNext()) {
+                    PGPSignatureSubpacketGenerator spGen = new PGPSignatureSubpacketGenerator();
+
+                    spGen.setSignerUserID(false, (String) it.next());
+                    signatureGenerator.setHashedSubpackets(spGen.generate());
+                }
+
+                if (compress)
+                    signatureGenerator.generateOnePassVersion(false).encode(compressedOut);
+                else if (encrypt)
+                    signatureGenerator.generateOnePassVersion(false).encode(encryptedOut);
+                else
+                    signatureGenerator.generateOnePassVersion(false).encode(outputStream);
+            }
+
+//            // Initialize literal data generator
+//            PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
+//            literalOut = literalDataGenerator.open(outputStream, PGPLiteralData.BINARY, inputFileName, new Date(), new byte [BUFFER_SIZE] );
+
+            // Create the Literal Data generator output stream
+            PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
+
+            if (compress)
+                literalOut = literalDataGenerator.open(compressedOut, PGPLiteralData.BINARY, inputFileName, new Date(), new byte[BUFFER_SIZE]);
+            else if(encrypt)
+                literalOut = literalDataGenerator.open(encryptedOut, PGPLiteralData.BINARY, inputFileName, new Date(), new byte[BUFFER_SIZE]);
+            else
+                literalOut = literalDataGenerator.open(outputStream, PGPLiteralData.BINARY, inputFileName, new Date(), new byte[BUFFER_SIZE]);
+
+            // Open the input file
+            InputStream inputStream = new BufferedInputStream(new FileInputStream(inputFileName));
+
+            BCPGOutputStream bOut = new BCPGOutputStream(literalOut);
+
+            int ch;
+            while ((ch = inputStream.read()) >= 0) {
+                literalOut.write(ch);
+                if (sign)
+                    signatureGenerator.update((byte) ch);
+            }
+
+            literalOut.close();
+            literalDataGenerator.close();
+
+            if (sign)
+                signatureGenerator.generate().encode(bOut);
+
+            if (compress) {
+                compressedOut.close();
+                compressedDataGenerator.close();
+            }
+
+            if (encrypt) {
+                encryptedOut.close();
+                encryptedDataGenerator.close();
+            }
+
+            inputStream.close();
+            bOut.close();
+
+            //if (radix64)
+            outputStream.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public static void main(String[] args) {
         Security.addProvider(new BouncyCastleProvider());
 
         try {
             UserState.getUserState().setPublicKey(Keys.getInstance().pgpPublicKeyRingCollection.getPublicKey(new BigInteger("9dfa654cc9b45f65", 16).longValue()));
             UserState.getUserState().setSecretKey(Keys.getInstance().pgpSecretKeyRingCollection.getSecretKey(new BigInteger("9dfa654cc9b45f65", 16).longValue()));
             UserState.getUserState().setPass("test");
-            sendMessage("poruka.txt", "encPoruka.txt.asc", true, true, true);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (PGPException e) {
-            e.printStackTrace();
-        } catch (SignatureException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (NoSuchProviderException e) {
+
+            UserState.getUserState().setInputFileName("poruka.txt");
+            UserState.getUserState().setOutputFileName("poruka.txt.asc");
+            UserState.getUserState().setRadix64(true);
+            UserState.getUserState().setCompress(false);
+            UserState.getUserState().setEncrypt(false);
+            UserState.getUserState().setSign(true);
+
+            sendMessage();
+            //sendMessage("poruka.txt", "encPoruka.txt.asc", false, true, true);
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 }
+
+

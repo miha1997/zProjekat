@@ -14,6 +14,13 @@ public class UserState {
     private PGPSecretKey secretKey;
     private PGPPublicKey publicKey;
     private String pass;
+    private boolean radix64;
+    private boolean encrypt;
+    private boolean compress;
+    private String inputFileName;
+    private String outputFileName;
+
+
 
     private static UserState userState;
 
@@ -90,5 +97,45 @@ public class UserState {
 
     public void setPublicKey(PGPPublicKey publicKey) {
         this.publicKey = publicKey;
+    }
+
+    public boolean isRadix64() {
+        return radix64;
+    }
+
+    public void setRadix64(boolean radix64) {
+        this.radix64 = radix64;
+    }
+
+    public boolean isEncrypt() {
+        return encrypt;
+    }
+
+    public void setEncrypt(boolean encrypt) {
+        this.encrypt = encrypt;
+    }
+
+    public boolean isCompress() {
+        return compress;
+    }
+
+    public void setCompress(boolean compress) {
+        this.compress = compress;
+    }
+
+    public String getInputFileName() {
+        return inputFileName;
+    }
+
+    public void setInputFileName(String inputFileName) {
+        this.inputFileName = inputFileName;
+    }
+
+    public String getOutputFileName() {
+        return outputFileName;
+    }
+
+    public void setOutputFileName(String outputFileName) {
+        this.outputFileName = outputFileName;
     }
 }
