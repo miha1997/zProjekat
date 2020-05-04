@@ -92,9 +92,9 @@ public class Home implements Initializable {
         if(file != null) {
             try{
                 long id = new BigInteger(item.getValue().getKeyIdProperty().getValue(), 16).longValue();
-                PGPKeyRing key = Keys.getInstance().pgpPublicKeyRingCollection.getPublicKeyRing(id);
+                PGPKeyRing key = Keys.instance.pgpPublicKeyRingCollection.getPublicKeyRing(id);
                 if (key == null)
-                    key = Keys.getInstance().pgpSecretKeyRingCollection.getSecretKeyRing(id);
+                    key = Keys.instance.pgpSecretKeyRingCollection.getSecretKeyRing(id);
 
                 CryptoLogic.exportKey(key, file.getAbsolutePath());
             }
@@ -114,7 +114,7 @@ public class Home implements Initializable {
     public void loadKeyList(){
         TreeItem<PrivateKey> privateKeyRoot = new TreeItem<>(new PrivateKey("identity", "keyId", false));
 
-        for(PrivateKey privateKey: Keys.getInstance().getPrivateKeys()){
+        for(PrivateKey privateKey: Keys.instance.getPrivateKeys()){
             TreeItem<PrivateKey> privateKeyTreeItem = new TreeItem<>(privateKey);
             privateKeyRoot.getChildren().addAll(privateKeyTreeItem);
         }
@@ -128,7 +128,7 @@ public class Home implements Initializable {
 
         TreeItem<PublicKey> publicKeyRoot = new TreeItem<>(new PublicKey("identity", "keyId", false));
 
-        for(PublicKey publicKey: Keys.getInstance().getPublicKeys()){
+        for(PublicKey publicKey: Keys.instance.getPublicKeys()){
             TreeItem<PublicKey> publicKeyTreeItem = new TreeItem<PublicKey>(publicKey);
             publicKeyRoot.getChildren().addAll(publicKeyTreeItem);
         }

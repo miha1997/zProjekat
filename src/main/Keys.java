@@ -14,7 +14,7 @@ import java.util.Iterator;
 import static main.PGPKeyTools.longToBytes;
 
 public class Keys {
-    private static final Keys instance = new Keys();
+    public static final Keys instance = new Keys();
 
     private static final String secretKeysFileName = "secret.asc";
     private static final String publicKeysFileName = "public.asc";
@@ -130,7 +130,7 @@ public class Keys {
         if (pgpPublicKeyRingCollection == null)
             pgpPublicKeyRingCollection = new PGPPublicKeyRingCollection(pgpPublicKeyRing.getEncoded(), new JcaKeyFingerprintCalculator());
         else
-            pgpPublicKeyRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(Keys.getInstance().pgpPublicKeyRingCollection, pgpPublicKeyRing);
+            pgpPublicKeyRingCollection = PGPPublicKeyRingCollection.addPublicKeyRing(Keys.instance.pgpPublicKeyRingCollection, pgpPublicKeyRing);
 
         ArmoredOutputStream publicOut = new ArmoredOutputStream (new FileOutputStream("public.asc"));
         pgpPublicKeyRingCollection.encode(publicOut);
@@ -141,17 +141,13 @@ public class Keys {
         if (pgpSecretKeyRingCollection == null)
             pgpSecretKeyRingCollection = new PGPSecretKeyRingCollection(pgpSecretKeyRing.getEncoded(), new JcaKeyFingerprintCalculator());
         else
-            pgpSecretKeyRingCollection = PGPSecretKeyRingCollection.addSecretKeyRing(Keys.getInstance().pgpSecretKeyRingCollection, pgpSecretKeyRing);
+            pgpSecretKeyRingCollection = PGPSecretKeyRingCollection.addSecretKeyRing(Keys.instance.pgpSecretKeyRingCollection, pgpSecretKeyRing);
         ArmoredOutputStream secretOut = new ArmoredOutputStream (new FileOutputStream("secret.asc"));
         pgpSecretKeyRingCollection.encode(secretOut);
         secretOut.close();
     }
 
-    public static Keys getInstance() {
-        return instance;
-    }
-
     public static void main(String[] args){
-        getInstance().printPrivateKeys();
+        instance.printPrivateKeys();
     }
 }

@@ -47,8 +47,8 @@ public class CryptoLogic {
             PGPSecretKeyRing pgpSecretKeyRing = pgpKeyRingGenerator.generateSecretKeyRing();
             PGPPublicKeyRing pgpPublicKeyRing = pgpKeyRingGenerator.generatePublicKeyRing();
 
-            Keys.getInstance().addPublicKeyRing(pgpPublicKeyRing);
-            Keys.getInstance().addSecretKeyRing(pgpSecretKeyRing);
+            Keys.instance.addPublicKeyRing(pgpPublicKeyRing);
+            Keys.instance.addSecretKeyRing(pgpSecretKeyRing);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -65,11 +65,11 @@ public class CryptoLogic {
             Object pgpFactory = iter.next();
             if (pgpFactory instanceof PGPPublicKeyRing) {
                 PGPPublicKeyRing keyRing = (PGPPublicKeyRing) pgpFactory;
-                Keys.getInstance().addPublicKeyRing(keyRing);
+                Keys.instance.addPublicKeyRing(keyRing);
 
             } else if (pgpFactory instanceof PGPSecretKeyRing) {
                 PGPSecretKeyRing keyRing = (PGPSecretKeyRing) pgpFactory;
-                Keys.getInstance().addSecretKeyRing(keyRing);
+                Keys.instance.addSecretKeyRing(keyRing);
             }
         }
     }
@@ -101,7 +101,7 @@ public class CryptoLogic {
         PGPSecretKey secretKey = UserState.instance.secretKey;
         char[] password = UserState.instance.pass.toCharArray();
 
-        if (!sign && !compress && !encrypt){
+        if (!sign && !compress && !encrypt &!armor){
             FileUtils.copyFile(new File(inputFileName), new File(outputFileName));
             return;
         }
@@ -148,26 +148,30 @@ public class CryptoLogic {
         // Create the Literal Data generator output stream
         PGPLiteralDataGenerator literalDataGenerator = new PGPLiteralDataGenerator();
         literalOut = literalDataGenerator.open(compressedOut, PGPLiteralData.BINARY,
-                String.valueOf(PGPLiteralData.TEXT), new Date(), new byte[BUFFER_SIZE]);
+                inputFileName, new Date(), new byte[BUFFER_SIZE]);
 
         // Open the input file
         InputStream inputStream = new BufferedInputStream(new FileInputStream(inputFileName));
+        BCPGOutputStream bOut = new BCPGOutputStream(literalOut);
+
         int ch;
         while ((ch = inputStream.read()) >= 0)
         {
             literalOut.write(ch);
-            signatureGenerator.update((byte)ch);
+            if (sign)
+                signatureGenerator.update((byte)ch);
         }
 
+        inputStream.close();
         literalOut.close();
         literalDataGenerator.close();
         if (sign)
-            signatureGenerator.generate().encode(compressedOut);
+            signatureGenerator.generate().encode(bOut);
+        bOut.close();
         compressedOut.close();
         compressedDataGenerator.close();
         encryptedOut.close();
         encryptedDataGenerator.close();
-        inputStream.close();
         outputStream.close();
     }
 
@@ -175,13 +179,13 @@ public class CryptoLogic {
         Security.addProvider(new BouncyCastleProvider());
 
         try {
-            UserState.instance.publicKey = Keys.getInstance().pgpPublicKeyRingCollection.getPublicKey(new BigInteger("9dfa654cc9b45f65", 16).longValue());
-            UserState.instance.secretKey = Keys.getInstance().pgpSecretKeyRingCollection.getSecretKey(new BigInteger("9dfa654cc9b45f65", 16).longValue());
+            UserState.instance.publicKey = Keys.instance.pgpPublicKeyRingCollection.getPublicKey(new BigInteger("9dfa654cc9b45f65", 16).longValue());
+            UserState.instance.secretKey = Keys.instance.pgpSecretKeyRingCollection.getSecretKey(new BigInteger("9dfa654cc9b45f65", 16).longValue());
             UserState.instance.pass = "test";
 
             UserState.instance.inputFileName = "poruka.txt";
             UserState.instance.outputFileName = "poruka.txt.asc";
-            UserState.instance.radix64 = true;
+            UserState.instance.radix64 = false;
             UserState.instance.compress = true;
             UserState.instance.encrypt = false;
             UserState.instance.sign = true;
