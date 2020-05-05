@@ -18,6 +18,7 @@ import javafx.util.Callback;
 import main.CryptoLogic;
 import main.Keys;
 import main.PGPKeyTools;
+import main.UserState;
 import org.bouncycastle.openpgp.*;
 
 import java.io.File;
@@ -50,7 +51,7 @@ public class Home implements Initializable {
 
     public static Home instance;
 
-    public void newKeyPair(ActionEvent event){
+    public void newKeyPair(ActionEvent event) {
         Parent root;
         try {
             root = FXMLLoader.load(Objects.requireNonNull(getClass().getClassLoader().getResource("gui/layouts/newKeyPair.fxml")));
@@ -58,36 +59,54 @@ public class Home implements Initializable {
             stage.setTitle("New Key Pair");
             stage.setScene(new Scene(root, 600, 400));
             stage.show();
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void importKey(ActionEvent event){
+    public void importKey(ActionEvent event) {
         FileChooser fileChooser = new FileChooser();
         File selectedFile = fileChooser.showOpenDialog(null);
 
-        if(selectedFile != null) {
-            try{
+        if (selectedFile != null) {
+            try {
                 CryptoLogic.instance.readKey(selectedFile.getAbsolutePath());
                 loadKeyList();
-            }
-            catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
 
-    public void exportKey(ActionEvent event){
+    public void sendMessage(ActionEvent event) {
+        FileChooser fileChooser = new FileChooser();
+        File selectedFile = fileChooser.showOpenDialog(null);
+
+        if (selectedFile != null) {
+            try {
+                UserState.instance.inputFileName = selectedFile.getAbsolutePath();
+
+                Parent root = FXMLLoader.load(Objects.requireNonNull(getClass().getClassLoader().getResource("gui/layouts/sendMessage.fxml")));
+                Stage stage = new Stage();
+                stage.setTitle("Send Message");
+                stage.setScene(new Scene(root, 600, 400));
+                stage.show();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void exportKey(ActionEvent event) {
         TreeItem<PrivateKey> item = privateTableView.getSelectionModel().getSelectedItem();
         if (item == null) return;
 
         FileChooser fileChooser = new FileChooser();
         File file = fileChooser.showSaveDialog(null);
 
-        if(file != null) {
-            try{
+        if (file != null) {
+            try {
                 long id = new BigInteger(item.getValue().getKeyIdProperty().getValue(), 16).longValue();
                 PGPPublicKeyRing key = Keys.instance.pgpPublicKeyRingCollection.getPublicKeyRing(id);
 
@@ -97,12 +116,11 @@ public class Home implements Initializable {
                     return;
                 }
 
-                if (key != null){
+                if (key != null) {
                     CryptoLogic.exportPublicKey(key, file.getAbsolutePath());
                 }
 
-            }
-            catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -115,10 +133,10 @@ public class Home implements Initializable {
         loadKeyList();
     }
 
-    public void loadKeyList(){
+    public void loadKeyList() {
         TreeItem<PrivateKey> privateKeyRoot = new TreeItem<>(new PrivateKey("identity", "keyId", "email"));
 
-        for(PrivateKey privateKey: Keys.instance.getPrivateKeys()){
+        for (PrivateKey privateKey : Keys.instance.getPrivateKeys()) {
             TreeItem<PrivateKey> privateKeyTreeItem = new TreeItem<>(privateKey);
             privateKeyRoot.getChildren().addAll(privateKeyTreeItem);
         }
@@ -132,7 +150,7 @@ public class Home implements Initializable {
 
         TreeItem<PublicKey> publicKeyRoot = new TreeItem<>(new PublicKey("identity", "keyID", "email"));
 
-        for(PublicKey publicKey: Keys.instance.getPublicKeys()){
+        for (PublicKey publicKey : Keys.instance.getPublicKeys()) {
             TreeItem<PublicKey> publicKeyTreeItem = new TreeItem<PublicKey>(publicKey);
             publicKeyRoot.getChildren().addAll(publicKeyTreeItem);
         }
@@ -145,7 +163,7 @@ public class Home implements Initializable {
         publicTableView.setShowRoot(false);
     }
 
-    public static class PrivateKey{
+    public static class PrivateKey {
         SimpleStringProperty nameProperty;
         SimpleStringProperty emailProperty;
         SimpleStringProperty keyIdProperty;
@@ -159,11 +177,18 @@ public class Home implements Initializable {
         public SimpleStringProperty getNameProperty() {
             return nameProperty;
         }
+
         public SimpleStringProperty getKeyIdProperty() {
             return keyIdProperty;
         }
+
         public SimpleStringProperty getEmailProperty() {
             return emailProperty;
+        }
+
+        @Override
+        public String toString() {
+            return nameProperty.getValue() + " " + emailProperty.getValue() + " " + keyIdProperty.getValue();
         }
     }
 
@@ -181,11 +206,18 @@ public class Home implements Initializable {
         public SimpleStringProperty getNameProperty() {
             return nameProperty;
         }
+
         public SimpleStringProperty getKeyIdProperty() {
             return keyIdProperty;
         }
+
         public SimpleStringProperty getEmailProperty() {
             return emailProperty;
+        }
+
+        @Override
+        public String toString() {
+            return nameProperty.getValue() + " " + emailProperty.getValue() + " " + keyIdProperty.getValue();
         }
     }
 }

@@ -3,6 +3,8 @@ package main;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPSecretKey;
 
+import java.io.File;
+
 public class UserState {
     //for generating keyPair
     public String name;
@@ -17,6 +19,7 @@ public class UserState {
     public boolean radix64;
     public boolean encrypt;
     public boolean compress;
+
     public String inputFileName;
     public String outputFileName;
     public String signatureFileName;
