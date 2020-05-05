@@ -8,10 +8,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeTableCell;
-import javafx.scene.control.TreeTableColumn;
-import javafx.scene.control.TreeTableView;
+import javafx.scene.control.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -19,6 +16,7 @@ import main.CryptoLogic;
 import main.Keys;
 import main.PGPKeyTools;
 import main.UserState;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.*;
 
 import java.io.File;
@@ -26,8 +24,10 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URL;
 import java.security.PublicKey;
+import java.security.Security;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ResourceBundle;
 
 public class Home implements Initializable {
@@ -50,6 +50,8 @@ public class Home implements Initializable {
     private TreeTableColumn<PublicKey, String> emailColumnPublic;
 
     public static Home instance;
+
+    public String message = "";
 
     public void newKeyPair(ActionEvent event) {
         Parent root;
@@ -78,6 +80,48 @@ public class Home implements Initializable {
         }
     }
 
+    public String getPassword(long id) {
+
+        try {
+            TextInputDialog dialog = new TextInputDialog("pasword");
+            dialog.setTitle("Password");
+            PGPSecretKeyRing keyRing = Keys.instance.pgpSecretKeyRingCollection.getSecretKeyRing(id);
+            if (keyRing == null) {
+                return null;
+            }
+            dialog.setHeaderText(keyRing.getSecretKey().getUserIDs().next());
+            dialog.setContentText("Please enter your password:");
+
+            Optional<String> result = dialog.showAndWait();
+            if (result.isPresent()) {
+                return result.get();
+            }
+        } catch (Exception e) {
+
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    public void showMessage(String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Info");
+        alert.setHeaderText(message);
+        alert.showAndWait();
+    }
+
+    public String chooseOutputFile() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Choose output file.");
+        File file = fileChooser.showSaveDialog(null);
+
+        if (file != null) {
+            return file.getAbsolutePath();
+        }
+
+        return "";
+    }
+
     public void sendMessage(ActionEvent event) {
         FileChooser fileChooser = new FileChooser();
         File selectedFile = fileChooser.showOpenDialog(null);
@@ -91,6 +135,37 @@ public class Home implements Initializable {
                 stage.setTitle("Send Message");
                 stage.setScene(new Scene(root, 600, 400));
                 stage.show();
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void verifySignature(ActionEvent event) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Choose signature file");
+        File selectedFile = fileChooser.showOpenDialog(null);
+
+        if (selectedFile != null) {
+            UserState.instance.signatureFileName = selectedFile.getAbsolutePath();
+            fileChooser.setTitle("Choose message");
+            selectedFile = fileChooser.showOpenDialog(null);
+            if (selectedFile != null) {
+                UserState.instance.inputFileName = selectedFile.getAbsolutePath();
+                CryptoLogic.checkDetachedSignature(this);
+            }
+        }
+    }
+
+    public void receiveMessage(ActionEvent event) {
+        FileChooser fileChooser = new FileChooser();
+        File selectedFile = fileChooser.showOpenDialog(null);
+
+        if (selectedFile != null) {
+            try {
+                UserState.instance.inputFileName = selectedFile.getAbsolutePath();
+                CryptoLogic.receive(this);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -126,9 +201,57 @@ public class Home implements Initializable {
         }
     }
 
+    public void deletePublicKey(ActionEvent event){
+        TreeItem<PublicKey> item = publicTableView.getSelectionModel().getSelectedItem();
+        if (item == null) return;
+
+        try {
+            long id = new BigInteger(item.getValue().getKeyIdProperty().getValue(), 16).longValue();
+            Keys.instance.deletePublicKey(id);
+            loadKeyList();
+        } catch (PGPException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void deletePrivateKey(ActionEvent event){
+        TreeItem<PrivateKey> item = privateTableView.getSelectionModel().getSelectedItem();
+        if (item == null) return;
+
+        TextInputDialog dialog = new TextInputDialog("pasword");
+        dialog.setTitle("Password");
+        dialog.setHeaderText("Password");
+        dialog.setContentText("Please enter your password:");
+
+        Optional<String> result = dialog.showAndWait();
+        if (result.isPresent()){
+            String password = result.get();
+            try {
+                long id = new BigInteger(item.getValue().getKeyIdProperty().getValue(), 16).longValue();
+                if (!Keys.instance.deleteSecretKey(id, password)){
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Wrong Password");
+                    alert.setHeaderText("Wrong Password");
+                    alert.setContentText("Ooops, wrong password");
+
+                    alert.showAndWait();
+                    return;
+                }
+                loadKeyList();
+            } catch (PGPException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+        Security.addProvider(new BouncyCastleProvider());
         instance = this;
         loadKeyList();
     }

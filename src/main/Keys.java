@@ -96,6 +96,32 @@ public class Keys {
         return null;
     }
 
+    public void deletePublicKey(long id) throws PGPException, IOException {
+        PGPPublicKeyRing ring = pgpPublicKeyRingCollection.getPublicKeyRing(id);
+        pgpPublicKeyRingCollection = PGPPublicKeyRingCollection.removePublicKeyRing(pgpPublicKeyRingCollection, ring);
+
+        ArmoredOutputStream publicOut = new ArmoredOutputStream (new FileOutputStream("public.asc"));
+        pgpPublicKeyRingCollection.encode(publicOut);
+        publicOut.close();
+    }
+
+    public boolean deleteSecretKey(long id, String password) throws PGPException, IOException {
+        PGPSecretKeyRing ring = pgpSecretKeyRingCollection.getSecretKeyRing(id);
+        PGPPrivateKey pgpPrivKey;
+        try {
+            pgpPrivKey = ring.getSecretKey().extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(password.toCharArray()));
+        }catch(Exception e){
+            return false;
+        }
+
+        pgpSecretKeyRingCollection = PGPSecretKeyRingCollection.removeSecretKeyRing(pgpSecretKeyRingCollection, ring);
+
+        ArmoredOutputStream secretOut = new ArmoredOutputStream (new FileOutputStream("secret.asc"));
+        pgpSecretKeyRingCollection.encode(secretOut);
+        secretOut.close();
+        return true;
+    }
+
     public ArrayList<Home.PublicKey> getPublicKeys() {
         ArrayList publicKeys = new ArrayList();
 

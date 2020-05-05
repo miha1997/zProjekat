@@ -116,9 +116,12 @@ public class SendMessage implements Initializable {
         UserState.instance.compress = compressCheckBox.isSelected();
         UserState.instance.pass = "";
 
-        if(encryptCheckBox.isSelected())
-            UserState.instance.publicKey = Keys.instance.findPublicKey(new BigInteger(addedPublicKeys.get(0).keyIdProperty.getValue(), 16).longValue());
-
+        if(encryptCheckBox.isSelected()) {
+            UserState.instance.pgpPublicKeys = new ArrayList<>();
+            for(Home.PublicKey key : addedPublicKeys){
+                UserState.instance.pgpPublicKeys.add(Keys.instance.findPublicKey(new BigInteger(key.keyIdProperty.getValue(), 16).longValue()));
+            }
+        }
         if(signCheckBox.isSelected()){
             try{
                 UserState.instance.secretKey = Keys.instance.pgpSecretKeyRingCollection.getSecretKey(new BigInteger(((Home.PrivateKey)signChoiceBox.getSelectionModel().getSelectedItem()).keyIdProperty.getValue(), 16).longValue());
@@ -127,6 +130,7 @@ public class SendMessage implements Initializable {
                 e.printStackTrace();
             }
         }
+
 
         try{
             CryptoLogic.sendMessage();
