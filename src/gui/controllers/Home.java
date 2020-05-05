@@ -18,10 +18,7 @@ import javafx.util.Callback;
 import main.CryptoLogic;
 import main.Keys;
 import main.PGPKeyTools;
-import org.bouncycastle.openpgp.PGPKeyRing;
-import org.bouncycastle.openpgp.PGPPublicKeyRing;
-import org.bouncycastle.openpgp.PGPSecretKey;
-import org.bouncycastle.openpgp.PGPSecretKeyRing;
+import org.bouncycastle.openpgp.*;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,7 +37,7 @@ public class Home implements Initializable {
     @FXML
     private TreeTableColumn<PrivateKey, String> nameColumnPrivate;
     @FXML
-    private TreeTableColumn<PrivateKey, String> masterKeyColumnPrivate;
+    private TreeTableColumn<PrivateKey, String> emailColumnPrivate;
 
     @FXML
     private TreeTableView<PublicKey> publicTableView;
@@ -49,7 +46,7 @@ public class Home implements Initializable {
     @FXML
     private TreeTableColumn<PublicKey, String> nameColumnPublic;
     @FXML
-    private TreeTableColumn<PublicKey, String> masterKeyColumnPublic;
+    private TreeTableColumn<PublicKey, String> emailColumnPublic;
 
     public static Home instance;
 
@@ -92,11 +89,18 @@ public class Home implements Initializable {
         if(file != null) {
             try{
                 long id = new BigInteger(item.getValue().getKeyIdProperty().getValue(), 16).longValue();
-                PGPKeyRing key = Keys.instance.pgpPublicKeyRingCollection.getPublicKeyRing(id);
-                if (key == null)
-                    key = Keys.instance.pgpSecretKeyRingCollection.getSecretKeyRing(id);
+                PGPPublicKeyRing key = Keys.instance.pgpPublicKeyRingCollection.getPublicKeyRing(id);
 
-                CryptoLogic.exportKey(key, file.getAbsolutePath());
+                PGPSecretKeyRing secKey = Keys.instance.pgpSecretKeyRingCollection.getSecretKeyRing(id);
+                if (secKey != null) {
+                    CryptoLogic.exportSecretKey(secKey, file.getAbsolutePath());
+                    return;
+                }
+
+                if (key != null){
+                    CryptoLogic.exportPublicKey(key, file.getAbsolutePath());
+                }
+
             }
             catch (Exception e){
                 e.printStackTrace();
@@ -112,7 +116,7 @@ public class Home implements Initializable {
     }
 
     public void loadKeyList(){
-        TreeItem<PrivateKey> privateKeyRoot = new TreeItem<>(new PrivateKey("identity", "keyId", false));
+        TreeItem<PrivateKey> privateKeyRoot = new TreeItem<>(new PrivateKey("identity", "keyId", "email"));
 
         for(PrivateKey privateKey: Keys.instance.getPrivateKeys()){
             TreeItem<PrivateKey> privateKeyTreeItem = new TreeItem<>(privateKey);
@@ -121,12 +125,12 @@ public class Home implements Initializable {
 
         nameColumnPrivate.setCellValueFactory(param -> param.getValue().getValue().getNameProperty());
         keyIDColumnPrivate.setCellValueFactory(param -> param.getValue().getValue().getKeyIdProperty());
-        masterKeyColumnPrivate.setCellValueFactory(param -> param.getValue().getValue().getMasterKeyProperty());
+        emailColumnPrivate.setCellValueFactory(param -> param.getValue().getValue().getEmailProperty());
 
         privateTableView.setRoot(privateKeyRoot);
         privateTableView.setShowRoot(false);
 
-        TreeItem<PublicKey> publicKeyRoot = new TreeItem<>(new PublicKey("identity", "keyId", false));
+        TreeItem<PublicKey> publicKeyRoot = new TreeItem<>(new PublicKey("identity", "keyID", "email"));
 
         for(PublicKey publicKey: Keys.instance.getPublicKeys()){
             TreeItem<PublicKey> publicKeyTreeItem = new TreeItem<PublicKey>(publicKey);
@@ -135,7 +139,7 @@ public class Home implements Initializable {
 
         nameColumnPublic.setCellValueFactory(param -> param.getValue().getValue().getNameProperty());
         keyIDColumnPublic.setCellValueFactory(param -> param.getValue().getValue().getKeyIdProperty());
-        masterKeyColumnPublic.setCellValueFactory(param -> param.getValue().getValue().getMasterKeyProperty());
+        emailColumnPublic.setCellValueFactory(param -> param.getValue().getValue().getEmailProperty());
 
         publicTableView.setRoot(publicKeyRoot);
         publicTableView.setShowRoot(false);
@@ -143,17 +147,13 @@ public class Home implements Initializable {
 
     public static class PrivateKey{
         SimpleStringProperty nameProperty;
+        SimpleStringProperty emailProperty;
         SimpleStringProperty keyIdProperty;
-        SimpleStringProperty masterKeyProperty;
 
-        public PrivateKey(String name, String keyId, boolean masterKey) {
+        public PrivateKey(String name, String keyId, String email) {
             this.nameProperty = new SimpleStringProperty(name);
             this.keyIdProperty = new SimpleStringProperty(keyId);
-
-            if(masterKey)
-                this.masterKeyProperty = new SimpleStringProperty("true");
-            else
-                this.masterKeyProperty = new SimpleStringProperty("false");
+            this.emailProperty = new SimpleStringProperty(email);
         }
 
         public SimpleStringProperty getNameProperty() {
@@ -162,24 +162,20 @@ public class Home implements Initializable {
         public SimpleStringProperty getKeyIdProperty() {
             return keyIdProperty;
         }
-        public SimpleStringProperty getMasterKeyProperty() {
-            return masterKeyProperty;
+        public SimpleStringProperty getEmailProperty() {
+            return emailProperty;
         }
     }
 
     public static class PublicKey {
         SimpleStringProperty nameProperty;
         SimpleStringProperty keyIdProperty;
-        SimpleStringProperty masterKeyProperty;
+        SimpleStringProperty emailProperty;
 
-        public PublicKey(String name, String keyId, boolean masterKey) {
+        public PublicKey(String name, String keyId, String email) {
             this.nameProperty = new SimpleStringProperty(name);
             this.keyIdProperty = new SimpleStringProperty(keyId);
-
-            if(masterKey)
-                this.masterKeyProperty = new SimpleStringProperty("true");
-            else
-                this.masterKeyProperty = new SimpleStringProperty("false");
+            this.emailProperty = new SimpleStringProperty(email);
         }
 
         public SimpleStringProperty getNameProperty() {
@@ -188,8 +184,8 @@ public class Home implements Initializable {
         public SimpleStringProperty getKeyIdProperty() {
             return keyIdProperty;
         }
-        public SimpleStringProperty getMasterKeyProperty() {
-            return masterKeyProperty;
+        public SimpleStringProperty getEmailProperty() {
+            return emailProperty;
         }
     }
 }

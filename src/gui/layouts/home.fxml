@@ -24,15 +24,15 @@
       <TreeTableView fx:id="privateTableView" layoutX="33.0" layoutY="128.0" prefHeight="144.0" prefWidth="644.0">
         <columns>
           <TreeTableColumn fx:id="nameColumnPrivate" prefWidth="161.99999618530273" text="Name" />
-          <TreeTableColumn fx:id="keyIDColumnPrivate" minWidth="8.199981689453125" prefWidth="312.40000915527344" text="keyID" />
-            <TreeTableColumn fx:id="masterKeyColumnPrivate" prefWidth="169.5999755859375" text="masterKey" />
+          <TreeTableColumn fx:id="emailColumnPrivate" minWidth="8.199981689453125" prefWidth="312.40000915527344" text="email" />
+            <TreeTableColumn fx:id="keyIDColumnPrivate" prefWidth="169.5999755859375" text="keyID" />
         </columns>
       </TreeTableView>
       <TreeTableView fx:id="publicTableView" layoutX="28.0" layoutY="314.0" prefHeight="144.0" prefWidth="644.0">
          <columns>
             <TreeTableColumn fx:id="nameColumnPublic" prefWidth="161.99999618530273" text="Name" />
-            <TreeTableColumn fx:id="keyIDColumnPublic" minWidth="8.199981689453125" prefWidth="312.40000915527344" text="keyID" />
-            <TreeTableColumn fx:id="masterKeyColumnPublic" prefWidth="169.5999755859375" text="masterKey" />
+            <TreeTableColumn fx:id="emailColumnPublic" minWidth="8.199981689453125" prefWidth="312.40000915527344" text="email" />
+            <TreeTableColumn fx:id="keyIDColumnPublic" prefWidth="169.5999755859375" text="keyID" />
          </columns>
       </TreeTableView>
     </children>

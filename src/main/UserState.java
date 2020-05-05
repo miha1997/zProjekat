@@ -19,6 +19,7 @@ public class UserState {
     public boolean compress;
     public String inputFileName;
     public String outputFileName;
+    public String signatureFileName;
 
     public static final UserState instance = new UserState();
 

@@ -5,6 +5,7 @@ import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGInputStream;
 import org.bouncycastle.openpgp.*;
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
+import org.bouncycastle.openpgp.operator.jcajce.JcePBESecretKeyDecryptorBuilder;
 import org.bouncycastle.util.encoders.Hex;
 
 import java.io.*;
@@ -60,6 +61,41 @@ public class Keys {
         }
     }
 
+    public PGPPrivateKey findSecretKey(long keyID, char[] pass) {
+        if(pgpSecretKeyRingCollection == null)
+            return null;
+
+        try{
+            PGPSecretKey pgpSecKey = pgpSecretKeyRingCollection.getSecretKey(keyID);
+
+            if (pgpSecKey == null)
+            {
+                return null;
+            }
+
+            return pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(pass));
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    public PGPPublicKey findPublicKey(long keyID) {
+        if(pgpPublicKeyRingCollection == null)
+            return null;
+
+        try{
+            PGPPublicKey pgpPubKey = pgpPublicKeyRingCollection.getPublicKey(keyID);
+            return pgpPubKey;
+
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
     public ArrayList<Home.PublicKey> getPublicKeys() {
         ArrayList publicKeys = new ArrayList();
 
@@ -73,11 +109,13 @@ public class Keys {
             while (keyIter.hasNext()) {
                 PGPPublicKey key = keyIter.next();
 
-                String ownerName = key.getUserIDs().next();
+                String userId = key.getUserIDs().next();
+                userId = userId.substring(0, userId.length() - 1);
+                String name = userId.split("<")[0];
+                String email = userId.split("<")[1];
                 String keyId = Hex.toHexString(longToBytes(key.getKeyID()));
-                boolean masterKey = key.isMasterKey();
 
-                Home.PublicKey publicKey = new Home.PublicKey(ownerName, keyId, masterKey);
+                Home.PublicKey publicKey = new Home.PublicKey(name, keyId, email);
                 publicKeys.add(publicKey);
                 break;
             }
@@ -98,11 +136,13 @@ public class Keys {
                 PGPSecretKey key = keyIter.next();
 
                 if (key.isSigningKey()) {
-                    String ownerName = key.getUserIDs().next();
+                    String userId = key.getUserIDs().next();
+                    userId = userId.substring(0, userId.length() - 1);
+                    String name = userId.split("<")[0];
+                    String email = userId.split("<")[1];
                     String keyId = Hex.toHexString(longToBytes(key.getKeyID()));
-                    boolean masterKey = key.isMasterKey();
 
-                    Home.PrivateKey privateKey = new Home.PrivateKey(ownerName, keyId, masterKey);
+                    Home.PrivateKey privateKey = new Home.PrivateKey(name, keyId, email);
                     privateKeys.add(privateKey);
                     break;
                 }
