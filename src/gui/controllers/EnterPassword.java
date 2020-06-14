@@ -3,6 +3,7 @@ package gui.controllers;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Label;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.stage.Stage;
@@ -11,9 +12,9 @@ import main.UserState;
 
 public class EnterPassword {
     @FXML
-    public TextField inputPassword;
+    public PasswordField inputPassword;
     @FXML
-    public TextField inputRepeat;
+    public PasswordField inputRepeat;
 
     @FXML
     public Label errorMessage;

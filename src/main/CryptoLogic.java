@@ -1,5 +1,6 @@
 package main;
 
+import gui.controllers.Home;
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGOutputStream;
@@ -21,6 +22,7 @@ import java.security.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 
 public class CryptoLogic {
     public static final CryptoLogic instance = new CryptoLogic();
@@ -125,6 +127,9 @@ public class CryptoLogic {
                 boolean cast5 = UserState.instance.cast5;
                 ArrayList<PGPPublicKey> pgpPublicKeys = UserState.instance.publicKeys;
 
+                //PGPPublicKey encKey = UserState.instance.getPublicKey();
+
+
                 JcePGPDataEncryptorBuilder encryptorBuilder;
                 if(cast5)
                     encryptorBuilder = new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5);
@@ -136,6 +141,12 @@ public class CryptoLogic {
 
                 for (PGPPublicKey publicKey : pgpPublicKeys) {
                     encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(publicKey).setProvider("BC"));
+                }
+
+                List<PGPPublicKey> publicKeys = UserState.instance.pgpPublicKeys;
+
+                for(PGPPublicKey key : publicKeys) {
+                    encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(key).setProvider("BC"));
                 }
 
                 encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
@@ -225,7 +236,7 @@ public class CryptoLogic {
 
     }
 
-    public static void checkDetachedSignature(){
+    public static void checkDetachedSignature(Home homeController){
         try {
             String inputFileName = UserState.instance.getInputFileName();
             String signatureFileName = UserState.instance.signatureFileName;
@@ -238,7 +249,13 @@ public class CryptoLogic {
             PGPSignature sig = ((PGPSignatureList) pgpFact.nextObject()).get(0);
 
             PGPPublicKey key = Keys.instance.findPublicKey(sig.getKeyID());
-            sig.init(new JcaPGPContentVerifierBuilderProvider().setProvider("BC"), key);
+            try {
+                sig.init(new JcaPGPContentVerifierBuilderProvider().setProvider("BC"), key);
+            }
+            catch (Exception e) {
+                homeController.showMessage("Signature verification failed. Unknown sender.");
+                return;
+            }
 
             byte[] buff = new byte[1024];
             int read = 0;
@@ -246,17 +263,19 @@ public class CryptoLogic {
                 sig.update(buff, 0, read);
             }
             signedData.close();
-            if(sig.verify())
-                System.out.println("signature verified.");
-            else
-                System.out.println("signature verification failed.");
+            if(sig.verify()) {
+                homeController.showMessage("Signature verifed by " + key.getUserIDs().next() + '\n');
+            }
+            else{
+                homeController.showMessage("Signature verification failed.");
+            }
         }
         catch (Exception ex) {
             ex.printStackTrace();
         }
     }
 
-    public static void receive(){
+    public static void receive(Home homeController){
         try{
             //get user input
             String inputFileName = UserState.instance.getInputFileName();
@@ -281,11 +300,22 @@ public class CryptoLogic {
 
                     while (sKey == null && it.hasNext()) {
                         pbe = (PGPPublicKeyEncryptedData) it.next();
-                        sKey = Keys.instance.findSecretKey(pbe.getKeyID(), pass.toCharArray());
+                        String password = homeController.getPassword(pbe.getKeyID());
+                        if (password == null) continue;
+                        try {
+                            PGPSecretKey pgpSecKey = Keys.instance.pgpSecretKeyRingCollection.getSecretKey(pbe.getKeyID());
+                            if (pgpSecKey == null) return;
+                            sKey = pgpSecKey.extractPrivateKey(new JcePBESecretKeyDecryptorBuilder().setProvider("BC").build(password.toCharArray()));
+
+                        }catch (Exception e) {
+                            homeController.showMessage("Wrong password");
+                            return;
+                        }
                     }
 
                     if (sKey == null) {
-                        throw new IllegalArgumentException("secret key for message not found.");
+                        homeController.showMessage("Decryption failed. Unknown receiver");
+                        return;
                     }
 
                     InputStream clear = pbe.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(sKey));
@@ -294,6 +324,7 @@ public class CryptoLogic {
 
                     //JcaPGPObjectFactory plainFact = new JcaPGPObjectFactory(clear);
                     //message = plainFact.nextObject();
+                    homeController.message += "Encryption successful\n";
                     continue;
                 }
 
@@ -305,12 +336,14 @@ public class CryptoLogic {
 
                     //JcaPGPObjectFactory pgpFact = new JcaPGPObjectFactory(cData.getDataStream());
                     //message = pgpFact.nextObject();
+                    homeController.message += "Compression successful\n";
                     continue;
                 }
 
                 if (message instanceof PGPLiteralData) {
                     PGPLiteralData ld = (PGPLiteralData) message;
 
+                    outputFileName = homeController.chooseOutputFile();
                     String outFileName = ld.getFileName();
                     if (outFileName.length() == 0) {
                         outFileName = outputFileName;
@@ -322,6 +355,7 @@ public class CryptoLogic {
                     Streams.pipeAll(unc, fOut);
 
                     fOut.close();
+                    homeController.message += "Message read";
                     break;
                 }
 
@@ -335,6 +369,7 @@ public class CryptoLogic {
                     InputStream dIn = p2.getInputStream();
                     int ch;
                     PGPPublicKey key = Keys.instance.findPublicKey(ops.getKeyID());
+                    outputFileName = homeController.chooseOutputFile();
                     FileOutputStream out = new FileOutputStream(outputFileName);
                     //FileOutputStream out = new FileOutputStream(p2.getFileName());
 
@@ -351,14 +386,18 @@ public class CryptoLogic {
                     PGPSignatureList p3 = (PGPSignatureList) message;
 
                     if (ops.verify(p3.get(0))) {
+                        homeController.message += "Signature verified by " + key.getUserIDs().next() + "\n";
                         System.out.println("signature verified.");
                     } else {
+                        homeController.message += "Signature verification failed!\n";
                         System.out.println("signature verification failed.");
                     }
                     break;
                 }
             }
 
+            homeController.showMessage(homeController.message);
+            homeController.message = "";
         }catch (Exception e){
             e.printStackTrace();
         }

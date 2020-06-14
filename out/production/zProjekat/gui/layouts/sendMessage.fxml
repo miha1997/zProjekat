@@ -29,7 +29,7 @@
       </Label>
       <ChoiceBox fx:id="signChoiceBox" layoutX="215.0" layoutY="89.0" prefWidth="150.0" />
       <ChoiceBox fx:id="encryptChoiceBox" layoutX="215.0" layoutY="152.0" prefWidth="150.0" />
-      <Button fx:id="addEncryptionKey" layoutX="326.0" layoutY="187.0" mnemonicParsing="false" onAction="#addPublicKey" text="Add" />
+      <Button fx:id="addEncryptionKey" layoutX="326.0" layoutY="189.0" mnemonicParsing="false" onAction="#addPublicKey" text="Add" />
       <Button layoutX="248.0" layoutY="333.0" mnemonicParsing="false" onAction="#sendMessage" text="Send">
          <font>
             <Font size="20.0" />
@@ -52,10 +52,10 @@
             <Font size="15.0" />
          </font>
       </Label>
-      <RadioButton fx:id="radio3DES" layoutX="287.0" layoutY="260.0" mnemonicParsing="false" selected="true" text="3DES" visible="false">
+      <RadioButton fx:id="radio3DES" layoutX="284.0" layoutY="260.0" mnemonicParsing="false" selected="true" text="3DES" visible="false">
          <toggleGroup>
             <ToggleGroup fx:id="symetricAlgo" />
          </toggleGroup></RadioButton>
-      <RadioButton fx:id="radioCAST5" layoutX="284.0" layoutY="293.0" mnemonicParsing="false" text="CAST5" toggleGroup="$symetricAlgo" visible="false" />
+      <RadioButton fx:id="radioCAST5" layoutX="281.0" layoutY="293.0" mnemonicParsing="false" text="CAST5" toggleGroup="$symetricAlgo" visible="false" />
    </children>
 </AnchorPane>

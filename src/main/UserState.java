@@ -5,6 +5,8 @@ import org.bouncycastle.openpgp.PGPSecretKey;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
+
 
 public class UserState {
     //for generating keyPair
@@ -26,6 +28,8 @@ public class UserState {
     public String inputFileName;
     public String outputFileName;
     public String signatureFileName;
+
+    public List<PGPPublicKey> pgpPublicKeys;
 
     public static final UserState instance = new UserState();
 

@@ -155,7 +155,6 @@ public class SendMessage implements Initializable {
             UserState.instance.publicKeys = publicKeys;
         }
 
-
         if(signCheckBox.isSelected()){
             try{
                 UserState.instance.secretKey = Keys.instance.pgpSecretKeyRingCollection.getSecretKey(new BigInteger(((Home.PrivateKey)signChoiceBox.getSelectionModel().getSelectedItem()).keyIdProperty.getValue(), 16).longValue());
@@ -164,6 +163,7 @@ public class SendMessage implements Initializable {
                 e.printStackTrace();
             }
         }
+
 
         try{
             CryptoLogic.sendMessage();
