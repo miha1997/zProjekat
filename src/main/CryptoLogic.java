@@ -18,6 +18,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.*;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 
@@ -38,13 +39,14 @@ public class CryptoLogic {
             kpg.initialize(keySize);
 
             KeyPair pair = kpg.generateKeyPair();
-
             PGPDigestCalculator sha1Calc = new JcaPGPDigestCalculatorProviderBuilder().build().get(HashAlgorithmTags.SHA1);
+            JcePBESecretKeyEncryptorBuilder encryptorBuilder = new JcePBESecretKeyEncryptorBuilder(PGPEncryptedData.CAST5, sha1Calc);
+
             PGPKeyPair keyPair = new JcaPGPKeyPair(PGPPublicKey.RSA_GENERAL, pair, new Date());
             PGPKeyRingGenerator pgpKeyRingGenerator = new PGPKeyRingGenerator(PGPSignature.DEFAULT_CERTIFICATION, keyPair, identity,
                     sha1Calc, null, null,
                     new JcaPGPContentSignerBuilder(keyPair.getPublicKey().getAlgorithm(), HashAlgorithmTags.SHA1),
-                    new JcePBESecretKeyEncryptorBuilder(PGPEncryptedData.CAST5, sha1Calc).setProvider("BC").build(passPhrase.toCharArray()));
+                    encryptorBuilder.setProvider("BC").build(passPhrase.toCharArray()));
 
             PGPSecretKeyRing pgpSecretKeyRing = pgpKeyRingGenerator.generateSecretKeyRing();
             PGPPublicKeyRing pgpPublicKeyRing = pgpKeyRingGenerator.generatePublicKeyRing();
@@ -99,7 +101,6 @@ public class CryptoLogic {
         PGPCompressedDataGenerator compressedDataGenerator = null;
         PGPEncryptedDataGenerator encryptedDataGenerator = null;
 
-
         //get user input
         boolean sign = UserState.instance.isSign();
         boolean encrypt = UserState.instance.isEncrypt();
@@ -121,12 +122,22 @@ public class CryptoLogic {
                 outputStream = new ArmoredOutputStream(outputStream);
 
             if (encrypt) {
-                PGPPublicKey encKey = UserState.instance.getPublicKey();
+                boolean cast5 = UserState.instance.cast5;
+                ArrayList<PGPPublicKey> pgpPublicKeys = UserState.instance.publicKeys;
 
-                encryptedDataGenerator = new PGPEncryptedDataGenerator(new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5).
-                        setWithIntegrityPacket(true).setSecureRandom(new SecureRandom()).setProvider("BC"));
+                JcePGPDataEncryptorBuilder encryptorBuilder;
+                if(cast5)
+                    encryptorBuilder = new JcePGPDataEncryptorBuilder(PGPEncryptedData.CAST5);
+                else
+                    encryptorBuilder = new JcePGPDataEncryptorBuilder(PGPEncryptedData.TRIPLE_DES);
 
-                encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(encKey).setProvider("BC"));
+                encryptedDataGenerator = new PGPEncryptedDataGenerator(encryptorBuilder.setWithIntegrityPacket(true).
+                        setSecureRandom(new SecureRandom()).setProvider("BC"));
+
+                for (PGPPublicKey publicKey : pgpPublicKeys) {
+                    encryptedDataGenerator.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(publicKey).setProvider("BC"));
+                }
+
                 encryptedOut = encryptedDataGenerator.open(outputStream, new byte[BUFFER_SIZE]);
             }
 

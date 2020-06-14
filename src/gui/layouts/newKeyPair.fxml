@@ -20,8 +20,8 @@
          <toggleGroup>
             <ToggleGroup fx:id="rsaKeyLength" />
          </toggleGroup></RadioButton>
-      <RadioButton id="radioButton2048" fx:id="radioButton2048" layoutX="300.0" layoutY="206.0" mnemonicParsing="false" text="2048" toggleGroup="$rsaKeyLength" />
-      <RadioButton id="radioButton4096" fx:id="radioButton4096" layoutX="300.0" layoutY="243.0" mnemonicParsing="false" text="4096" toggleGroup="$rsaKeyLength" />
+      <RadioButton id="radioButton2048" fx:id="radioButton2048" layoutX="300.0" layoutY="200.0" mnemonicParsing="false" text="2048" toggleGroup="$rsaKeyLength" />
+      <RadioButton id="radioButton4096" fx:id="radioButton4096" layoutX="300.0" layoutY="227.0" mnemonicParsing="false" text="4096" toggleGroup="$rsaKeyLength" />
       <Button layoutX="248.0" layoutY="322.0" mnemonicParsing="false" onAction="#submitFormNewKeyPair" prefHeight="39.0" prefWidth="102.0" text="Submit" />
       <Label layoutX="165.0" layoutY="43.0" prefHeight="27.0" prefWidth="269.0" text="Form for creating new Key Pair">
          <font>

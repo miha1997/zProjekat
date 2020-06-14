@@ -11,10 +11,12 @@ import javafx.stage.Stage;
 import main.CryptoLogic;
 import main.Keys;
 import main.UserState;
+import org.bouncycastle.openpgp.PGPPublicKey;
 
 import java.io.File;
 import java.math.BigInteger;
 import java.net.URL;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
 
@@ -38,6 +40,15 @@ public class SendMessage implements Initializable {
 
     @FXML
     private Label errorLabel;
+
+    @FXML
+    private Label labelEncryption;
+
+    @FXML
+    private RadioButton radio3DES;
+
+    @FXML
+    private RadioButton radioCAST5;
 
     @FXML
     private ListView<Home.PublicKey> keyListView;
@@ -90,6 +101,20 @@ public class SendMessage implements Initializable {
 
     }
 
+    public void encryptionClicked(ActionEvent event){
+        if(encryptCheckBox.isSelected()){
+            labelEncryption.setVisible(true);
+            radio3DES.setVisible(true);
+            radioCAST5.setVisible(true);
+
+        }else{
+            labelEncryption.setVisible(false);
+            radio3DES.setVisible(false);
+            radioCAST5.setVisible(false);
+        }
+
+    }
+
     public void sendMessage(ActionEvent event){
         if(signCheckBox.isSelected() && passwordTextField.getText().equals("")){
             errorLabel.setVisible(true);
@@ -116,8 +141,20 @@ public class SendMessage implements Initializable {
         UserState.instance.compress = compressCheckBox.isSelected();
         UserState.instance.pass = "";
 
-        if(encryptCheckBox.isSelected())
-            UserState.instance.publicKey = Keys.instance.findPublicKey(new BigInteger(addedPublicKeys.get(0).keyIdProperty.getValue(), 16).longValue());
+        if(encryptCheckBox.isSelected()){
+            boolean cast5 = false;
+            if(radioCAST5.isSelected())
+                cast5 = true;
+
+            UserState.instance.cast5 = cast5;
+
+            ArrayList<PGPPublicKey> publicKeys = new ArrayList<>();
+            for (Home.PublicKey key : addedPublicKeys) {
+                publicKeys.add(Keys.instance.findPublicKey(new BigInteger(key.keyIdProperty.getValue(), 16).longValue()));
+            }
+            UserState.instance.publicKeys = publicKeys;
+        }
+
 
         if(signCheckBox.isSelected()){
             try{

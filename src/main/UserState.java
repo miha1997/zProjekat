@@ -4,17 +4,20 @@ import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPSecretKey;
 
 import java.io.File;
+import java.util.ArrayList;
 
 public class UserState {
     //for generating keyPair
     public String name;
     public String email;
     public String password;
+    public boolean cast5;
     public int keySize;
 
     public boolean sign;
     public PGPSecretKey secretKey;
     public PGPPublicKey publicKey;
+    public ArrayList<PGPPublicKey> publicKeys;
     public String pass;
     public boolean radix64;
     public boolean encrypt;
