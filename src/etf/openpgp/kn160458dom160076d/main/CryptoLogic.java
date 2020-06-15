@@ -276,6 +276,7 @@ public class CryptoLogic {
             String inputFileName = UserState.instance.getInputFileName();
             String outputFileName = UserState.instance.getOutputFileName();
             String pass = UserState.instance.getPass();
+            PGPPublicKeyEncryptedData pbe = null;
 
             InputStream in = new FileInputStream(inputFileName);
             in = PGPUtil.getDecoderStream(in);
@@ -295,10 +296,9 @@ public class CryptoLogic {
                 if(message instanceof PGPEncryptedDataList){
                     enc = (PGPEncryptedDataList) message;
 
-
                     Iterator it = enc.getEncryptedDataObjects();
                     PGPPrivateKey sKey = null;
-                    PGPPublicKeyEncryptedData pbe = null;
+
 
                     while (sKey == null && it.hasNext()) {
                         pbe = (PGPPublicKeyEncryptedData) it.next();
@@ -322,13 +322,6 @@ public class CryptoLogic {
                     }
 
                     InputStream clear = pbe.getDataStream(new JcePublicKeyDataDecryptorFactoryBuilder().setProvider("BC").build(sKey));
-
-                    //check integrity
-                    if(! pbe.verify()) {
-                        homeController.showMessage("Integrity check failed!");
-                        return;
-                    }
-
                     pgpF = new JcaPGPObjectFactory(clear);
                     message = pgpF.nextObject();
 
@@ -353,6 +346,8 @@ public class CryptoLogic {
                 if (message instanceof PGPLiteralData) {
                     PGPLiteralData ld = (PGPLiteralData) message;
 
+
+
                     outputFileName = homeController.chooseOutputFile();
                     String outFileName = ld.getFileName();
                     if (outFileName.length() == 0) {
@@ -366,6 +361,15 @@ public class CryptoLogic {
 
                     fOut.close();
                     homeController.message += "Message read";
+
+                    if(pbe != null && pbe.isIntegrityProtected()){
+                        if(! pbe.verify()){
+                            //check integrity
+                            homeController.showMessage("Integrity check failed!");
+                            return;
+                        }
+                    }
+                    
                     break;
                 }
 
